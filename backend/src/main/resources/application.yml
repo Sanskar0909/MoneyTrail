@@ -1,0 +1,47 @@
+spring:
+  application:
+    name: moneytrail
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:moneytrail}
+    username: ${DB_USER:moneytrail}
+    password: ${DB_PASSWORD:moneytrail}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  servlet:
+    multipart:
+      max-file-size: 15MB
+      max-request-size: 16MB
+
+server:
+  port: ${SERVER_PORT:8080}
+
+moneytrail:
+  storage:
+    endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+    access-key: ${MINIO_ACCESS_KEY:moneytrail}
+    secret-key: ${MINIO_SECRET_KEY:moneytrail123}
+    bucket: ${MINIO_BUCKET:moneytrail-receipts}
+  auth:
+    # Auth is deferred. Every owned row points at the single user seeded by V2__seed_data.sql.
+    # Replaced by SecurityContextHolder resolution inside CurrentUserProvider once auth lands.
+    seeded-user-id: 1
+  upload:
+    allowed-content-types: image/jpeg,image/png,image/heic,application/pdf
+    max-file-size-bytes: 15728640
+  pipeline:
+    job-poll-interval-ms: 5000
+    auto-confirm-threshold: 1.1 # >1.0 means "never auto-confirm" (per MVP review policy); tune down later once extraction is trusted
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
