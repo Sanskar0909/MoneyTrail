@@ -3,8 +3,7 @@ package com.moneytrail.pipeline;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
-
+import java.time.Duration;
 import java.time.Instant;
 
 @Entity
@@ -78,13 +77,17 @@ public class ProcessingJob {
         this.updatedAt = Instant.now();
     }
 
-    public void retryWithBackoff(Long secondsToAdd, String error) {
-        this.nextRetryAt = Instant.now().plusSeconds(secondsToAdd);
+    public void markForRetry(Duration backoff, String error) {
+        this.nextRetryAt = Instant.now().plus(backoff);
         this.status = JobStatus.PENDING;
         this.lockedBy = null;
         this.lockedAt = null;
         this.updatedAt = Instant.now();
         this.lastError = error;
+    }
+
+    public boolean hasAttemptsRemaining() {
+        return this.attemptCount < this.maxAttempts;
     }
 
 

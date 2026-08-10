@@ -38,6 +38,8 @@ moneytrail:
     max-file-size-bytes: 15728640
   pipeline:
     job-poll-interval-ms: 5000
+    batch-size: 5              # jobs claimed per poll; keep at or below the worker pool's capacity
+    lease-duration: 5m         # a RUNNING job untouched for this long is presumed abandoned and reclaimed
     auto-confirm-threshold: 1.1 # >1.0 means "never auto-confirm" (per MVP review policy); tune down later once extraction is trusted
 
 management:
