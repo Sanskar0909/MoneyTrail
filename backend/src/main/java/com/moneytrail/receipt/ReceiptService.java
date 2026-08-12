@@ -39,15 +39,18 @@ public class ReceiptService {
     private final FileStorageClient fileStorageClient;
     private final ReceiptRepository receiptRepository;
     private final CurrentUserProvider currentUserProvider;
+    private final ReceiptCreationService receiptCreationService;
 
     public ReceiptService(UploadProperties uploadProperties,
                           FileStorageClient fileStorageClient,
                           ReceiptRepository receiptRepository,
-                          CurrentUserProvider currentUserProvider) {
+                          CurrentUserProvider currentUserProvider,
+                          ReceiptCreationService receiptCreationService) {
         this.uploadProperties = uploadProperties;
         this.fileStorageClient = fileStorageClient;
         this.receiptRepository = receiptRepository;
         this.currentUserProvider = currentUserProvider;
+        this.receiptCreationService = receiptCreationService;
     }
 
     /**
@@ -72,7 +75,10 @@ public class ReceiptService {
         }
 
         try {
-            return ReceiptResponse.from(persist(file, storageKey, uploadedAt));
+            Receipt receipt = buildReceipt(file, storageKey, uploadedAt);
+            Receipt withJob = receiptCreationService.createWithJob(receipt);
+
+            return ReceiptResponse.from(withJob);
         } catch (RuntimeException e) {
             deleteQuietly(storageKey);
             throw e;
@@ -105,7 +111,7 @@ public class ReceiptService {
         }
     }
 
-    private Receipt persist(MultipartFile file, String storageKey, Instant uploadedAt) {
+    private Receipt buildReceipt(MultipartFile file, String storageKey, Instant uploadedAt) {
         Receipt receipt = new Receipt();
         receipt.setOwnerId(currentUserProvider.currentUserId());
         receipt.setStatus(ReceiptStatus.UPLOADED);
@@ -114,7 +120,7 @@ public class ReceiptService {
         receipt.setContentType(file.getContentType());
         receipt.setFileSizeBytes(file.getSize());
         receipt.setUploadedAt(uploadedAt);
-        return receiptRepository.save(receipt);
+        return receipt;
     }
 
     /**
