@@ -100,4 +100,29 @@ public class ReceiptExtraction {
 
         return receiptExtraction;
     }
+
+    public static ReceiptExtraction succeeded(Long receiptId, int attemptNumber, String llmProvider,
+                                              String llmModel, Integer durationMs,
+                                              ExtractionResult extractionResult) {
+
+        ReceiptExtraction receiptExtraction = new ReceiptExtraction();
+        receiptExtraction.receiptId = receiptId;
+        receiptExtraction.attemptNumber = attemptNumber;
+        receiptExtraction.llmProvider = llmProvider;
+        receiptExtraction.llmModel = llmModel;
+        receiptExtraction.durationMs = durationMs;
+        receiptExtraction.rawResponse = extractionResult.rawResponse();
+        receiptExtraction.parsedSuccessfully = true;
+        receiptExtraction.createdAt = Instant.now();
+
+        receiptExtraction.merchantName = extractionResult.merchantName();
+        receiptExtraction.receiptDate = extractionResult.receiptDate();
+        receiptExtraction.tip = extractionResult.tip();
+        receiptExtraction.tax = extractionResult.tax();
+        receiptExtraction.subtotal = extractionResult.subtotal();
+        receiptExtraction.totalAmount = extractionResult.totalAmount();
+        receiptExtraction.confidenceScore = extractionResult.confidenceScore();
+
+        return receiptExtraction;
+    }
 }
