@@ -4,7 +4,7 @@ import { useReceipts } from './hooks/useReceipts';
 import './App.css';
 
 export default function App() {
-  const { receipts, isLoading, error, refresh } = useReceipts();
+  const { receipts, isLoading, isPolling, error, refresh } = useReceipts();
 
   return (
     <div className="app">
@@ -18,6 +18,7 @@ export default function App() {
         <ReceiptList
           receipts={receipts}
           isLoading={isLoading}
+          isPolling={isPolling}
           error={error}
           onRefresh={() => void refresh()}
         />

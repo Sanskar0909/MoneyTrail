@@ -20,7 +20,7 @@
 .app-main {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 32px;
 }
 
 /* ---------- panels ---------- */
@@ -152,54 +152,174 @@
   color: var(--accent);
 }
 
-/* ---------- table ---------- */
+/* ---------- receipts ---------- */
 
-.table-scroll {
-  overflow-x: auto;
+/* The section has no panel: the slips sit straight on the page, like receipts on a desk. */
+.receipts-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14px;
-  white-space: nowrap;
-}
-
-.table th {
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border);
-  color: var(--text-muted);
+.live-hint {
   font-size: 12px;
-  font-weight: 600;
-  text-align: left;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  color: var(--text-muted);
 }
 
-.table td {
-  padding: 12px;
-  border-bottom: 1px solid var(--border);
-  vertical-align: middle;
+.live-hint::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: 1px;
 }
 
-.table tbody tr:last-child td {
-  border-bottom: none;
+.receipt-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 28px 20px;
+  margin: 0;
+  padding: 4px 0 0;
+  list-style: none;
 }
 
-.table .numeric {
-  text-align: right;
+/* Shadow lives on the wrapper: a mask clips anything painted outside the masked element, so a
+   box-shadow on the paper itself would be cut off. drop-shadow follows the torn outline. */
+.receipt {
+  filter: drop-shadow(0 1px 1px var(--paper-shadow)) drop-shadow(0 8px 16px var(--paper-shadow));
+}
+
+.receipt-paper {
+  --tooth-w: 12px;
+  --tooth-h: 6px;
+
+  /* Paper is always light, whatever the app theme, so everything printed on it uses ink tokens. */
+  color-scheme: light;
+  --text: var(--paper-ink);
+  --text-muted: var(--paper-ink-muted);
+  --accent: #3b5bdb;
+  --accent-soft: rgba(59, 91, 219, 0.1);
+  --danger: #c92a2a;
+  --danger-soft: rgba(201, 42, 42, 0.1);
+
+  height: 100%;
+  padding: calc(var(--tooth-h) + 16px) 16px calc(var(--tooth-h) + 14px);
+  background: var(--paper);
+  color: var(--paper-ink);
+  font-family: var(--font-receipt);
+  font-size: 13px;
+  line-height: 1.45;
   font-variant-numeric: tabular-nums;
+
+  /* Torn edges: a row of 90° teeth along the top and bottom, plus the body in between. */
+  -webkit-mask:
+    conic-gradient(from 135deg at top, #000 90deg, #0000 0) top / var(--tooth-w) var(--tooth-h)
+      repeat-x,
+    conic-gradient(from -45deg at bottom, #000 90deg, #0000 0) bottom / var(--tooth-w)
+      var(--tooth-h) repeat-x,
+    linear-gradient(#000 0 0) 0 var(--tooth-h) / 100% calc(100% - 2 * var(--tooth-h)) no-repeat;
+  mask:
+    conic-gradient(from 135deg at top, #000 90deg, #0000 0) top / var(--tooth-w) var(--tooth-h)
+      repeat-x,
+    conic-gradient(from -45deg at bottom, #000 90deg, #0000 0) bottom / var(--tooth-w)
+      var(--tooth-h) repeat-x,
+    linear-gradient(#000 0 0) 0 var(--tooth-h) / 100% calc(100% - 2 * var(--tooth-h)) no-repeat;
 }
 
-.filename {
-  max-width: 260px;
+.receipt-head {
+  padding-bottom: 12px;
+  border-bottom: 1px dashed var(--paper-rule);
+  text-align: center;
+}
+
+.receipt-merchant {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+.receipt-merchant[data-unread] {
+  color: var(--paper-ink-muted);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.receipt-file {
+  margin: 4px 0 0;
   overflow: hidden;
+  color: var(--paper-ink-muted);
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.muted {
-  color: var(--text-muted);
+.receipt-lines {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 14px 0;
+}
+
+.receipt-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+/* Label, dotted leader, value: the way a till prints a line. */
+.receipt-line dt {
+  display: flex;
+  flex: 1;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--paper-ink-muted);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.receipt-line dt::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px dotted var(--paper-rule);
+  transform: translateY(-3px);
+}
+
+.receipt-line dd {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.receipt-total dd {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.receipt-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--paper-rule);
+  text-align: center;
+}
+
+.receipt-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 12px;
+  margin: 0;
+  color: var(--paper-ink-muted);
+  font-size: 11px;
 }
 
 /* ---------- status badge ---------- */
@@ -250,12 +370,48 @@
   }
 }
 
+/* On paper the badge is ink, so it keeps its light-theme colours even in dark mode. */
+.receipt-paper .badge[data-status='NEEDS_REVIEW'] {
+  color: #b06d09;
+}
+
+.receipt-paper .badge[data-status='CONFIRMED'] {
+  color: #2b8a3e;
+}
+
+/* ---------- motion ---------- */
+
+@media (prefers-reduced-motion: no-preference) {
+  /* A new slip slides in as it's added; polling re-renders keep their keys so they don't replay. */
+  .receipt {
+    animation: receipt-in 260ms ease-out both;
+  }
+
+  /* The only thing on the page that is genuinely happening right now. */
+  .badge[data-status='PROCESSING'] {
+    animation: badge-pulse 1.6s ease-in-out infinite;
+  }
+}
+
+@keyframes receipt-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes badge-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
 @media (max-width: 640px) {
   .app {
     padding: 32px 16px 64px;
   }
 
-  .filename {
-    max-width: 140px;
+  .panel-header {
+    flex-wrap: wrap;
   }
 }

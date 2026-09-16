@@ -11,6 +11,14 @@
   --radius: 10px;
   --shadow: 0 1px 2px rgba(16, 16, 24, 0.05), 0 4px 12px rgba(16, 16, 24, 0.04);
 
+  /* Receipt paper. Slightly warm, like thermal till roll, so it reads as paper on a white panel. */
+  --paper: #fdfcf8;
+  --paper-ink: #1c1b18;
+  --paper-ink-muted: #6f6c64;
+  --paper-rule: #c9c6bd;
+  --paper-shadow: rgba(16, 16, 24, 0.14);
+  --font-receipt: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   font-size: 15px;
   line-height: 1.5;
@@ -31,6 +39,13 @@
     --danger: #ff8787;
     --danger-soft: rgba(255, 135, 135, 0.12);
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.2);
+
+    /* Paper stays paper in the dark: a real receipt on a dark desk, dimmed so it doesn't glare. */
+    --paper: #e9e6de;
+    --paper-ink: #1c1b18;
+    --paper-ink-muted: #5f5c55;
+    --paper-rule: #b6b2a8;
+    --paper-shadow: rgba(0, 0, 0, 0.5);
   }
 }
 
