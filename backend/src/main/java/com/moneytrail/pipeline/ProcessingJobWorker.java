@@ -75,9 +75,14 @@ public class ProcessingJobWorker {
         ExtractionResult extractionResult = receiptExtractionClient.processImage(image, receipt.getContentType());
         int durationMs = (int) ((System.nanoTime() - start) / 1_000_000);
 
-        processingJobWorkerMapping.mapChanges(jobId, receipt.getId(), extractionResult,
+        boolean updated = processingJobWorkerMapping.mapChanges(jobId, receipt.getId(),
+                job.getAttemptCount(), extractionResult,
                 receiptExtractionClient.provider(), receiptExtractionClient.model(), durationMs);
 
-        log.info("Job {} finished: receipt {} is ready for review ({} ms)", jobId, receipt.getId(), durationMs);
+        if (updated) {
+            log.info("Job {} finished: receipt {} is ready for review ({} ms)", jobId, receipt.getId(), durationMs);
+        } else {
+            log.info("Job {} discarded: receipt {} changed while the extraction was running", jobId, receipt.getId());
+        }
     }
 }

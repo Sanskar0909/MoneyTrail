@@ -29,30 +29,44 @@ public class ProcessingJobWorkerMapping {
         this.processingJobRepository = processingJobRepository;
     }
 
+    /**
+     * Records the attempt and, if this worker is still the one that owns the receipt, copies the
+     * extracted values onto it.
+     *
+     * @return true if the receipt was updated, false if someone else finished or confirmed it while
+     *         the extraction was running
+     */
     @Transactional
-    public void mapChanges(Long jobId, Long receiptId, ExtractionResult extractionResult,
-                           String llmProvider, String llmModel, int durationMs) {
+    public boolean mapChanges(Long jobId, Long receiptId, int attemptNumber,
+                              ExtractionResult extractionResult,
+                              String llmProvider, String llmModel, int durationMs) {
+
+        receiptExtractionRepository.save(ReceiptExtraction.succeeded(
+                receiptId, attemptNumber, llmProvider, llmModel, durationMs, extractionResult));
 
         boolean stillOurs = receiptStateMachineService.transition(
                 receiptId, ReceiptStatus.PROCESSING, ReceiptStatus.NEEDS_REVIEW);
+
+        ProcessingJob job = processingJobRepository.findById(jobId).orElseThrow();
+        job.markAsSucceeded();
+
         if (!stillOurs) {
-            completeJob(jobId);
-            return;
+            return false;
         }
 
         Receipt receipt = receiptRepository.findById(receiptId).orElseThrow();
-        ProcessingJob job = processingJobRepository.findById(jobId).orElseThrow();
-
-        receiptExtractionRepository.save(ReceiptExtraction.succeeded(
-                receiptId, job.getAttemptCount(), llmProvider, llmModel, durationMs, extractionResult));
-
         receipt.setMerchantName(extractionResult.merchantName());
         receipt.setReceiptDate(extractionResult.receiptDate());
         receipt.setTotalAmount(extractionResult.totalAmount());
 
-        job.markAsSucceeded();
+        return true;
     }
 
+    /**
+     * Closes out a job that has nothing left to do. Without this the job would stay RUNNING, get
+     * reclaimed when its lease expires, and repeat the same pointless work until it ran out of
+     * attempts.
+     */
     @Transactional
     public void completeJob(Long jobId) {
         processingJobRepository.findById(jobId).ifPresent(ProcessingJob::markAsSucceeded);
