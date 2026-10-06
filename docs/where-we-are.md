@@ -34,6 +34,8 @@ This all works right now, on your laptop:
 8. The worker saves a record of the attempt, copies the values onto the receipt, moves it to
    `NEEDS_REVIEW`, and marks the job done.
 9. The web page is polling, so the receipt changes from Uploaded to Needs review on its own.
+10. You click the receipt (or **Start reviewing**). The review screen shows the photo next to what
+    the model read. You correct anything it got wrong and confirm; the receipt becomes `CONFIRMED`.
 
 If anything fails along the way, the job waits 30 seconds and tries again, then 60 seconds, and
 after the third failure both the job and the receipt are marked `FAILED`.
@@ -61,7 +63,10 @@ after the third failure both the job and the receipt are marked `FAILED`.
 |---|---|
 | `Receipt` | One row in the receipts table |
 | `ReceiptStatus` | Uploaded → Processing → Needs review → Confirmed, plus Failed |
-| `ReceiptController` | The two web endpoints: upload, and list |
+| `ReceiptController` | The web endpoints: upload and list, plus the four the review screen uses — one receipt, its photo, corrections, confirm |
+| `ReceiptDetailResponse` | One receipt for the review screen, with the model's subtotal, tax, tip and confidence |
+| `ReceiptUpdateRequest` | A correction. Fields left out (or null) keep their value |
+| `ReceiptImage` | The photo's bytes and content type, on their way out of the photo endpoint |
 | `ReceiptService` | The upload logic — validate, store the file, handle cleanup if the database write fails |
 | `ReceiptCreationService` | Writes the receipt row and its job row together, so you can't get one without the other |
 | `ReceiptStateMachineService` | The rules for which status changes are allowed, and the safe way to apply them |
@@ -88,11 +93,18 @@ after the third failure both the job and the receipt are marked `FAILED`.
 
 | File | What it's for |
 |---|---|
-| `App.tsx` | The page |
+| `App.tsx` | The page: the receipt list, or the review screen, depending on the URL |
 | `UploadPanel.tsx` | Drag-and-drop upload box |
-| `ReceiptList.tsx` | The receipts, drawn as paper slips |
+| `ReceiptList.tsx` | The receipts, drawn as paper slips. Each one opens its review |
 | `StatusBadge.tsx` | The coloured status label |
 | `useReceipts.ts` | Fetches the list, and re-fetches while something is processing |
+| `ReviewScreen.tsx` | The review page: photo on one side, an editable slip on the other, Confirm |
+| `ReviewSlip.tsx` | The editable slip itself, the printer it comes out of, and the stamp |
+| `ReceiptPhoto.tsx` | The original photo, with a magnifier and zoom; PDFs and HEIC handled too |
+| `ConfidenceMeter.tsx` | How sure the model was, as a meter |
+| `useRoute.ts` | Which page to show, from the `#/receipts/17` part of the URL |
+| `useReceipt.ts`, `useReceiptFile.ts` | Load one receipt (re-checking while it's being read), and its photo |
+| `review.ts` | The review rules: what counts as a correction, what's valid, what gets sent |
 | `api.ts`, `format.ts` | Talking to the backend; formatting money and dates |
 
 ---
@@ -107,6 +119,9 @@ after the third failure both the job and the receipt are marked `FAILED`.
 - Status rules — a slow worker cannot overwrite a receipt you have already confirmed
 - A permanent log of every read attempt, successful or not
 - The web page: upload, list, live status updates
+- Reviewing: open a receipt, compare it with the photo, correct merchant/date/total, confirm, and
+  move on to the next one. Conflicts — a receipt confirmed in another tab, say — are caught and
+  explained, and corrections are never lost to them
 
 All of the above has been run and watched working, not just written.
 
@@ -115,8 +130,8 @@ All of the above has been run and watched working, not just written.
 ## 5. What doesn't work yet
 
 - **Reading receipts is fake.** This is the big one. Everything else is real
-- **There is no review screen.** You can see a list, but you cannot open a receipt, correct it, or
-  confirm it — which is the whole point of the app
+- **Failed receipts are a dead end.** The server won't accept corrections to a `FAILED` receipt, so
+  the review screen can only suggest uploading a better photo. Manual entry (step 5) fixes this
 - **Line items aren't stored.** The table exists; nothing fills it
 - **Nothing checks the maths.** Whether the numbers add up isn't verified yet
 - **No login.** Everything belongs to one hardcoded user
@@ -128,8 +143,8 @@ All of the above has been run and watched working, not just written.
 
 1. **Finish the Gemini client** — one method, `toExtractionResult`, which turns the AI's JSON into
    an `ExtractionResult`. *This is the next thing.*
-2. **Review screen** — four endpoints (view one receipt, show its photo, save corrections, confirm)
-   and the page itself.
+2. ~~**Review screen** — four endpoints (view one receipt, show its photo, save corrections,
+   confirm) and the page itself.~~ Done.
 3. **Validation and line items** — store each line, check that they add up, show mismatches in the
    review screen.
 4. **Phone support** — a manifest so it installs on your home screen, and a camera button.

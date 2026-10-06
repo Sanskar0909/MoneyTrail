@@ -20,6 +20,7 @@ This document explains every file in `frontend/src`, what each concept means, an
 12. [The CSS approach](#12-the-css-approach)
 13. [Accessibility, and why it's in there](#13-accessibility-and-why-its-in-there)
 14. [What was deliberately *not* done](#14-what-was-deliberately-not-done)
+15. [The review screen](#15-the-review-screen)
 
 ---
 
@@ -33,16 +34,28 @@ frontend/
 ├── index.html                  the single HTML page the browser loads
 └── src/
     ├── main.tsx                entry point: mounts React into the page
-    ├── App.tsx                 top-level layout; wires the pieces together
+    ├── App.tsx                 top-level layout; picks the page; wires the pieces together
     ├── api.ts                  ALL HTTP lives here. Types + fetch functions.
     ├── format.ts               pure display helpers (money, dates, bytes)
+    ├── review.ts               pure review rules: corrections, validation, the queue
     ├── hooks/
-    │   └── useReceipts.ts      reusable stateful logic for loading the list
+    │   ├── useReceipts.ts      reusable stateful logic for loading the list
+    │   ├── useRoute.ts         which page to show, from the URL's #hash
+    │   ├── useReceipt.ts       one receipt, re-checked while it's being read
+    │   └── useReceiptFile.ts   a receipt's original upload, as an object URL
     └── components/
         ├── UploadPanel.tsx     drag-and-drop / click to upload
-        ├── ReceiptList.tsx     the table of receipts
-        └── StatusBadge.tsx     the coloured status pill
+        ├── ReceiptList.tsx     the receipts, as paper slips; each opens its review
+        ├── StatusBadge.tsx     the coloured status pill
+        ├── ReviewScreen.tsx    the review page: state, Confirm, recovering from 409s
+        ├── ReviewScreen.css    its styles
+        ├── ReviewSlip.tsx      the editable slip, the printer it comes out of, the stamp
+        ├── ReceiptPhoto.tsx    the original on a lightbox: loupe, zoom, PDF, HEIC
+        ├── ConfidenceMeter.tsx the model's confidence as a segmented meter
+        └── icons.tsx           a few inline SVG icons
 ```
+
+Sections 5–14 cover the files that existed first; [section 15](#15-the-review-screen) covers the review screen.
 
 ### The layering, in terms you already know
 
@@ -479,34 +492,38 @@ A custom exception type carrying the HTTP status. Why bother instead of throwing
 
 `readonly` means the field can't be reassigned after construction — the equivalent of `final`.
 
-### `parseResponse`
+### `send` and `request`
 
 ```ts
-async function parseResponse<T>(response: Response): Promise<T> {
-  if (response.ok) return (await response.json()) as T;
-  ...
-  throw new ApiError(message, response.status);
+async function send(input: string, init?: RequestInit): Promise<Response> {
+  let response: Response;
+  try {
+    response = await fetch(input, init);
+  } catch (cause) {
+    if (cause instanceof DOMException && cause.name === 'AbortError') throw cause;
+    throw new ApiError('Could not reach the server. Is the backend running?', 0);
+  }
+  if (!response.ok) {
+    throw new ApiError(await readErrorMessage(response), response.status);
+  }
+  return response;
+}
+
+async function request<T>(input: string, init?: RequestInit): Promise<T> {
+  const response = await send(input, init);
+  return (await response.json()) as T;
 }
 ```
+
+`send` does the checking; `request` adds "and the body is JSON". They're split because one endpoint — the receipt's original file — isn't JSON: `getReceiptFile` calls `send` and reads the body with `response.blob()` instead.
 
 **A critical `fetch` gotcha:** `fetch` does **not** throw on HTTP error statuses. A `404` or `500` is a perfectly successful *network* operation — the promise resolves normally. Only network-level failures (DNS, connection refused, CORS) reject.
 
 That surprises everyone once. `response.ok` (true for 200–299) is what you actually check. Without it, a `415` would fall through as if it succeeded and you'd try to read a receipt out of an error body.
 
-The error path then tries to extract `message` from the body — matching what `GlobalExceptionHandler` returns — and falls back to status text if the body isn't JSON (a proxy error page, say). Because the server owns the wording, your validation messages live in exactly one place.
+`readErrorMessage` then tries to extract `message` from the body — matching what `GlobalExceptionHandler` returns — and falls back to status text if the body isn't JSON (a proxy error page, say). Because the server owns the wording, your validation messages live in exactly one place.
 
-### `request`
-
-```ts
-try {
-  response = await fetch(input, init);
-} catch (cause) {
-  if (cause instanceof DOMException && cause.name === 'AbortError') throw cause;
-  throw new ApiError('Could not reach the server. Is the backend running?', 0);
-}
-```
-
-Wraps genuine network failures so callers only ever handle `ApiError`. Status `0` is the convention for "no HTTP response happened at all."
+The `try`/`catch` around `fetch` wraps genuine network failures so callers only ever handle `ApiError`. Status `0` is the convention for "no HTTP response happened at all."
 
 The `AbortError` re-throw matters: when *we* cancel a request deliberately (component unmounted), that's not an error to show the user. It's rethrown unchanged so the caller can recognise and ignore it.
 
@@ -838,7 +855,7 @@ This is where **state lives at the lowest common ancestor** of the components th
 
 ## 12. The CSS approach
 
-No framework, no Tailwind, no CSS-in-JS. Two stylesheets and custom properties.
+No framework, no Tailwind, no CSS-in-JS. Plain stylesheets and custom properties: `index.css` for the tokens, `App.css` for the list page, and `ReviewScreen.css` beside the component it styles — imported from `ReviewScreen.tsx`, so Vite bundles it with the screen.
 
 ### Custom properties (CSS variables)
 
@@ -873,7 +890,7 @@ Mixes 16% green with transparent — a tinted background derived from the same c
 
 ### Layout
 
-Flexbox throughout (`display: flex`), which handles everything here. No grid needed for a single-column page.
+Flexbox for most of it (`display: flex`). The list of slips and the review screen's two columns use grid, which is the right tool when you want columns that line up.
 
 ```css
 .table-scroll { overflow-x: auto; }
@@ -907,10 +924,115 @@ Worth knowing what's missing and why, so you can judge when it stops being the r
 
 - **No state library (Redux, Zustand).** One screen, one list. `useState` in a custom hook is enough. Add one when prop-drilling becomes painful, not before.
 - **No data-fetching library (TanStack Query, SWR).** Those handle caching, deduplication, retries, and polling — genuinely valuable once you have several screens sharing data. With one endpoint it's a dependency for no gain. **This is worth revisiting in Week 2**, when statuses change server-side and you'll want polling with background refetch.
-- **No router.** One page. Week 3 adds the review queue, and that's when a router earns its place.
+- **No router library.** There are two pages now, and `useRoute.ts` handles them in about twenty lines (see [section 15](#15-the-review-screen)). React Router earns its place when there are nested layouts, many parameters, or data loading tied to routes.
 - **No component library (MUI, shadcn).** The plan says minimal UI effort; hand-written CSS for four components is less code than configuring a design system.
-- **No tests.** The most testable pieces are already isolated (`format.ts` is pure; `ReceiptList` is presentational) — the structure is test-ready even though the tests aren't written. If you add any, start with `format.ts`.
+- **No tests.** The most testable pieces are already isolated (`format.ts` and `review.ts` are pure; `ReceiptList` is presentational) — the structure is test-ready even though the tests aren't written. If you add any, start with `review.ts`: it holds the money parsing and the validation rules, which are the things worth pinning down.
 - **No optimistic updates.** The list refetches after upload rather than immediately showing the new row. Refetching is simpler and always correct; optimistic updates need rollback logic on failure. Not worth it when the request takes 50ms.
+
+---
+
+## 15. The review screen
+
+Click a slip (or **Start reviewing** above the list) and the page becomes the review screen: the original upload on a dark lightbox on the left, and on the right a fresh copy of the receipt coming out of a till printer. That copy *is* the form. Merchant, date and total are editable; the model's subtotal, tax, tip and confidence are printed for reference. One button confirms. A confirmed receipt gets a rubber stamp.
+
+### Routing without a router — `hooks/useRoute.ts`
+
+The URL decides the page: `/#/` is the list, `/#/receipts/17` reviews receipt 17.
+
+```ts
+export function useRoute(): Route {
+  return parseRoute(useSyncExternalStore(subscribe, readHash));
+}
+```
+
+**`useSyncExternalStore`** is how a component reads state that lives *outside* React — here, `window.location.hash`. You give it two functions: `subscribe` (start listening for changes; return a function that stops) and a snapshot reader. React re-renders whenever the snapshot changes. It's the correct replacement for the `useState` + `useEffect` + event-listener dance, which can briefly show a stale value.
+
+**Why the hash, not a path?** The part after `#` never reaches the server. `/#/receipts/17` is still a request for `/`, so any static host serves `index.html`. A real path, `/receipts/17`, would need a "serve index.html for unknown paths" rule on every server that ever hosts the app — Spring Boot included, when you deploy. The links are ordinary `<a href="#/receipts/17">`, so back, forward, bookmarks and middle-click-to-open-in-a-new-tab all work with no code.
+
+### Resetting a whole screen with `key`
+
+```tsx
+<ReviewScreen key={reviewingId} receiptId={reviewingId} … />
+```
+
+You met `key` in lists. It works on any component: a different key means React treats it as a *different component instance*, throws the old one away and mounts a fresh one. Moving from receipt 17 to receipt 18 therefore starts with no edits, no messages and no zoom left over — without a single line of "reset everything" code. The Java analogy is constructing a new object instead of clearing an old one's fields.
+
+### The data — `useReceipt.ts` and `useReceiptFile.ts`
+
+`useReceipt` is `useReceipts` for one receipt, with the same adaptive polling: while the receipt is `UPLOADED` or `PROCESSING` it re-fetches every 2.5 seconds, so a receipt opened straight after upload shows "Reading receipt…" and then prints its slip by itself. It also returns two things the screen needs:
+
+- `reload()` resolves to the fresh receipt — the 409 handling below depends on it.
+- `replace(receipt)` shows a receipt the server has just sent back from a save or confirm. Those responses *are* the new truth, so there's nothing to refetch.
+
+`useReceiptFile` downloads the original as a **`Blob`** (raw bytes plus a MIME type) instead of pointing an `<img>` at the URL. The detail response doesn't say what kind of file it is, and the screen has to know before it can choose how to show it: a photo goes in an `<img>`, a PDF in an `<object>`. **`URL.createObjectURL(blob)`** turns the bytes into a `blob:` URL that `<img>` and CSS can use. It pins the file in memory until **`URL.revokeObjectURL`** is called, which is why the effect's cleanup revokes it — the same reason you close a stream in Java's `finally`.
+
+### Edits, not copies — `review.ts`
+
+The form doesn't copy the receipt into state. It keeps only what the person has typed:
+
+```ts
+export type Edits = Partial<Record<EditableField, string>>;
+// what an input shows:
+edits[field] ?? savedText(receipt, field)
+```
+
+`Partial<T>` makes every property optional. A field that hasn't been touched is simply absent, so the server's value shows through. This matters when the receipt is reloaded underneath the form (after a 409): untouched fields pick up the new values, and only the person's real corrections are carried over. A copied draft would silently put the old values back.
+
+Some rules worth knowing, all in `review.ts` as pure functions:
+
+- **Money is parsed from text into whole paise** — `"1,224.3"` → `122430` — never through `parseFloat`. Floating point can't represent 1224.30 exactly; integers up to 2⁵³ are exact. It goes out as `paise / 100`, and `JSON.stringify` writes the shortest decimal that reads back as the same double, so Jackson receives `471.5`, not `471.49999…`, and builds an exact `BigDecimal`.
+- **Only changed fields are sent.** Typing `1224.3` over `1224.30` isn't a change. `PATCH` semantics: what you leave out keeps its value.
+- **A field with a value can't be cleared.** The server skips nulls, so "clear the merchant" would silently do nothing. The form refuses it with a message instead.
+- **Every field is checked as it will be confirmed**, not only the edited ones. No total means no confirm, whether or not anyone typed in that box — the same rule the server enforces, caught before the request.
+- **The total is `type="text" inputMode="decimal"`, not `type="number"`.** Number inputs change value when you scroll over them, accept `1e5`, and handle decimal commas differently by locale. `inputMode` still brings up the numeric keyboard on a phone.
+- **`input.validity.badInput`** is how the screen spots a half-typed date. Browsers report an incomplete date as an empty value; only the input itself knows it's incomplete.
+
+### One button: Confirm
+
+If there are corrections, the button reads **Save & confirm** and sends `PATCH` then `POST /confirm`. The screen only updates with the final answer, so correcting an already-confirmed receipt (which the server moves back to `NEEDS_REVIEW` before confirming again) doesn't flicker through "Needs review" on the way. If the save succeeds and the confirm fails, the saved values stay on screen and the message says exactly that.
+
+There's no separate Save button. The job of this screen is to get a receipt to *confirmed*; a second button would be a second decision on every receipt.
+
+### The 409s
+
+A 409 means *the screen's copy of the receipt is out of date*. So the first move is always the same — fetch the real one — and what to say is decided from what the receipt turns out to be, not from the message text. Nothing the person typed is ever thrown away.
+
+| What happened | The server says | The screen |
+|---|---|---|
+| Confirmed in another tab first | 409 "no longer waiting for review" | Reloads, sees `CONFIRMED`, and treats it as success: the stamp lands, "Already confirmed". Telling someone their confirm *failed* because it already happened would be wrong. |
+| No total | 409 "Add a total before confirming" | Puts the server's message on the total field. Normally caught before the request is sent. |
+| The receipt left review while open | 409 "cannot be edited while it is PROCESSING" | Reloads, shows the reading state, keeps the corrections; the form comes back with them when the slip prints. |
+| Anything else | 409 | Reloads, says it changed while open, keeps the corrections. |
+
+The server's own advice — "Reload it and try again" — is the one thing the screen does for you.
+
+### The photo — refs and direct DOM writes
+
+The **loupe** follows the mouse and shows the photo magnified underneath. On every mouse move it writes `style.transform` and `style.backgroundPosition` straight onto the element through a ref, rather than going through state. State would mean re-rendering the component sixty times a second for something nothing else on the page cares about — a reasonable place to step outside React.
+
+**Click to zoom** enlarges the photo two and a half times inside a scrollable panel, and scrolls so the point you clicked is in the middle. That scroll happens in **`useLayoutEffect`** — like `useEffect`, but it runs after React updates the DOM and *before* the browser paints, so you never see the zoomed photo in the wrong place for a frame. Dragging pans it (with **pointer capture**, so the drag keeps working when the mouse leaves the panel); a drag ends with a click event too, so a flag stops it from also zooming out. Touch uses native scrolling, Escape fits the photo again.
+
+A PDF goes into `<object type="application/pdf">`, which uses the browser's own viewer; whatever is *inside* the `<object>` is shown where there is no viewer (most phones). An `<img>` that fails to decode — HEIC everywhere but Safari — fires `onError`, and the panel offers the file as a download instead of a broken image.
+
+### Accessibility on this screen
+
+- The page heading takes focus when the screen opens, so a screen reader starts at the new page rather than nowhere.
+- On Confirm with problems, focus jumps to the first field that needs fixing. Inputs carry `aria-invalid`, and `aria-describedby` points at their error and at the "was …" note.
+- After confirming, the Confirm button no longer exists, so focus moves to **Next receipt**, which replaced it. A `role="status"` region announces what was confirmed.
+- The stamp is `aria-hidden`; the status badge says "Confirmed" in words.
+- The confidence meter's bar is decoration; the percentage and the advice under it say the same in text.
+- With *reduce motion* switched on in the OS, the slip doesn't feed out of the printer and the stamp doesn't land — they're simply there.
+
+### The look
+
+Everything on the right is drawn on the same thermal paper as the list (`.receipt-paper`, torn edges and all), and the details are things that happen to real paper:
+
+- **The printer.** A dark slot sits above the slip. `clip-path` on the slip's container hides anything above the slot, and the slip starts `translateY(-100%)` — fully inside the printer — then slides down. New slip, new print.
+- **Corrections in pen.** A changed value turns blue, with the saved value struck through underneath and an Undo. The field being edited gets a highlighter-yellow background.
+- **Unread fields** — the model returned null — are marked in amber with a note, rather than left as an empty box.
+- **The stamp** is a bordered word rotated eleven degrees. Its speckled, not-quite-even ink is an SVG noise pattern (`feTurbulence`) used as a CSS mask, and `mix-blend-mode: multiply` lets the print show through it the way real ink does.
+- **The confidence meter** is 20 segments, green at 90% and above, amber from 70%, red below — judgement calls, documented in `confidenceLevel`.
+- New tokens in `index.css`: `--ink` and `--on-ink` for the primary button, `--lightbox` for the photo panel, and `--paper-highlight`, `--paper-pen` and `--stamp-ink` for marks made on paper.
 
 ---
 

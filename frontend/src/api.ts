@@ -1,8 +1,8 @@
 /**
  * Client for the MoneyTrail backend.
  *
- * Types here mirror `ReceiptResponse` on the server. If the DTO changes, change it here too —
- * nothing enforces the contract across the boundary.
+ * Types here mirror `ReceiptResponse` and `ReceiptDetailResponse` on the server. If a DTO changes,
+ * change it here too — nothing enforces the contract across the boundary.
  */
 
 export const RECEIPT_STATUSES = [
@@ -16,6 +16,12 @@ export const RECEIPT_STATUSES = [
 
 export type ReceiptStatus = (typeof RECEIPT_STATUSES)[number];
 
+/** Statuses the pipeline will change on its own. Everything else only changes when a person acts. */
+export const IN_FLIGHT_STATUSES: ReadonlySet<ReceiptStatus> = new Set(['UPLOADED', 'PROCESSING']);
+
+/** The statuses `PATCH /api/receipts/{id}` accepts. Anything else is answered with a 409. */
+export const EDITABLE_STATUSES: ReadonlySet<ReceiptStatus> = new Set(['NEEDS_REVIEW', 'CONFIRMED']);
+
 export interface Receipt {
   id: number;
   status: ReceiptStatus;
@@ -28,6 +34,35 @@ export interface Receipt {
   currency: string;
   /** ISO instant in UTC. */
   uploadedAt: string;
+}
+
+/**
+ * The parts of the model's latest successful reading that are not copied onto the receipt.
+ * Nothing in the API edits these: they are what the model saw, kept for comparison.
+ */
+export interface ReceiptExtraction {
+  subtotal: number | null;
+  tax: number | null;
+  tip: number | null;
+  /** Between 0 and 1: how sure the model said it was. */
+  confidenceScore: number | null;
+}
+
+/** One receipt with everything the review screen needs. Mirrors `ReceiptDetailResponse`. */
+export interface ReceiptDetail extends Receipt {
+  /** Null until an extraction attempt has succeeded. */
+  extraction: ReceiptExtraction | null;
+}
+
+/**
+ * A correction, as `ReceiptUpdateRequest` takes it. Only the fields present are changed: the
+ * server skips nulls, so a field that has a value can be corrected but never cleared.
+ */
+export interface ReceiptUpdate {
+  merchantName?: string;
+  /** ISO date, `2026-08-04`. */
+  receiptDate?: string;
+  totalAmount?: number;
 }
 
 /** Mirrors `moneytrail.upload.*` in application.yml. The server is the real authority. */
@@ -58,11 +93,7 @@ export class ApiError extends Error {
  * The backend's GlobalExceptionHandler returns `{ message, timestamp }` for every failure, so
  * we surface `message` directly. Falls back to the status text if the body isn't what we expect.
  */
-async function parseResponse<T>(response: Response): Promise<T> {
-  if (response.ok) {
-    return (await response.json()) as T;
-  }
-
+async function readErrorMessage(response: Response): Promise<string> {
   let message = response.statusText || `Request failed with ${response.status}`;
   try {
     const body: unknown = await response.json();
@@ -72,12 +103,14 @@ async function parseResponse<T>(response: Response): Promise<T> {
   } catch {
     // Non-JSON error body (e.g. a proxy error page) — keep the status-based message.
   }
-
-  throw new ApiError(message, response.status);
+  return message;
 }
 
-/** Wraps network-level failures so callers only ever have to handle ApiError. */
-async function request<T>(input: string, init?: RequestInit): Promise<T> {
+/**
+ * Sends a request and returns the response only if it succeeded. Network failures and error
+ * statuses both become ApiError, so callers only ever have to handle one thing.
+ */
+async function send(input: string, init?: RequestInit): Promise<Response> {
   let response: Response;
   try {
     response = await fetch(input, init);
@@ -87,7 +120,15 @@ async function request<T>(input: string, init?: RequestInit): Promise<T> {
     }
     throw new ApiError('Could not reach the server. Is the backend running?', 0);
   }
-  return parseResponse<T>(response);
+  if (!response.ok) {
+    throw new ApiError(await readErrorMessage(response), response.status);
+  }
+  return response;
+}
+
+async function request<T>(input: string, init?: RequestInit): Promise<T> {
+  const response = await send(input, init);
+  return (await response.json()) as T;
 }
 
 export function uploadReceipt(file: File, signal?: AbortSignal): Promise<Receipt> {
@@ -98,4 +139,48 @@ export function uploadReceipt(file: File, signal?: AbortSignal): Promise<Receipt
 
 export function listReceipts(signal?: AbortSignal): Promise<Receipt[]> {
   return request<Receipt[]>('/api/receipts', { signal });
+}
+
+export function getReceipt(receiptId: number, signal?: AbortSignal): Promise<ReceiptDetail> {
+  return request<ReceiptDetail>(`/api/receipts/${receiptId}`, { signal });
+}
+
+/**
+ * Saves corrections. Only send the fields that changed: a field left out keeps its value.
+ *
+ * Correcting a confirmed receipt sends it back to NEEDS_REVIEW, so it has to be confirmed again.
+ */
+export function updateReceipt(
+  receiptId: number,
+  update: ReceiptUpdate,
+  signal?: AbortSignal,
+): Promise<ReceiptDetail> {
+  return request<ReceiptDetail>(`/api/receipts/${receiptId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(update),
+    signal,
+  });
+}
+
+/**
+ * Marks a reviewed receipt as correct. Answers 409 if it has no total, or if it is no longer
+ * waiting for review — confirmed in another tab, say.
+ */
+export function confirmReceipt(receiptId: number, signal?: AbortSignal): Promise<ReceiptDetail> {
+  return request<ReceiptDetail>(`/api/receipts/${receiptId}/confirm`, { method: 'POST', signal });
+}
+
+/** Where the original upload is served, for links that open or download it. */
+export function receiptFileUrl(receiptId: number): string {
+  return `/api/receipts/${receiptId}/image`;
+}
+
+/**
+ * The original upload as a Blob. Its `type` is the stored content type, which the detail
+ * response doesn't include and the viewer needs: a PDF can't be shown the way a photo is.
+ */
+export async function getReceiptFile(receiptId: number, signal?: AbortSignal): Promise<Blob> {
+  const response = await send(receiptFileUrl(receiptId), { signal });
+  return response.blob();
 }

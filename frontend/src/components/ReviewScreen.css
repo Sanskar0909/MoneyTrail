@@ -1,0 +1,1021 @@
+/*
+ * The review screen. The original sits on a dark lightbox on the left; on the right, a clean copy
+ * of the receipt comes out of a till printer, gets checked and corrected, and is stamped when
+ * confirmed. Everything printed on the slip uses the paper tokens from index.css.
+ */
+
+.review {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* ---------- top bar and heading ---------- */
+
+.review-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 32px;
+}
+
+.review-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: -10px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 14px;
+  text-decoration: none;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.review-back:hover {
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  color: var(--text);
+}
+
+.review-waiting {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.review-waiting::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #e8a33d;
+}
+
+.review-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.review-title {
+  font-size: 26px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+/* Focused by the page itself when it opens, never by a person, so it needs no ring. */
+.review-title:focus {
+  outline: none;
+}
+
+.review-lede {
+  max-width: 62ch;
+  margin: 6px 0 0;
+  color: var(--text-muted);
+}
+
+.review-header .badge {
+  flex: none;
+  margin-top: 5px;
+}
+
+.review-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(330px, 400px);
+  align-items: start;
+  gap: 40px;
+}
+
+.review-side,
+.review-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+/* ---------- the original, on a lightbox ---------- */
+
+.photo {
+  position: sticky;
+  top: 20px;
+  display: flex;
+  flex-direction: column;
+  height: min(calc(100vh - 40px), 900px);
+  min-height: 420px;
+  margin: 0;
+  overflow: hidden;
+  border-radius: 18px;
+  background-color: var(--lightbox);
+  /* A soft pool of light over a faint dot grid, like a light table. */
+  background-image:
+    radial-gradient(ellipse 70% 55% at 50% 42%, rgba(255, 255, 255, 0.075), transparent 70%),
+    radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1.5px);
+  background-size:
+    auto,
+    18px 18px;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 24px 48px -28px rgba(16, 16, 24, 0.6);
+  color: rgba(255, 255, 255, 0.92);
+  color-scheme: dark;
+}
+
+.photo-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Auto margins on the photo centre it while it fits, and let it scroll edge to edge once it doesn't
+   — centring with justify-content would push the overflow off the start, out of scroll reach. */
+.photo-viewport {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  padding: 28px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+  scrollbar-width: thin;
+}
+
+.photo-viewport:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -4px;
+}
+
+.photo-image {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  margin: auto;
+  border-radius: 4px;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 20px 44px rgba(0, 0, 0, 0.55);
+  cursor: zoom-in;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.photo-viewport[data-zoomed] .photo-image {
+  border-radius: 0;
+  cursor: zoom-out;
+}
+
+.photo-viewport[data-dragging] .photo-image {
+  cursor: grabbing;
+}
+
+.photo-loupe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 184px;
+  height: 184px;
+  border-radius: 50%;
+  background-color: #fff;
+  background-repeat: no-repeat;
+  box-shadow:
+    0 0 0 3px rgba(255, 255, 255, 0.92),
+    0 0 0 4px rgba(0, 0, 0, 0.3),
+    0 18px 40px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+  visibility: hidden;
+  will-change: transform;
+}
+
+.photo-pdf {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.photo-message {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 32px;
+  text-align: center;
+}
+
+.photo-message-title {
+  margin: 0;
+  font-weight: 600;
+}
+
+.photo-message-detail {
+  max-width: 42ch;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13.5px;
+}
+
+.photo-message .photo-tool {
+  margin-top: 10px;
+}
+
+.photo-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.photo-loading-paper {
+  width: min(46%, 260px);
+  aspect-ratio: 3 / 4.2;
+  border-radius: 4px;
+  background: linear-gradient(
+      100deg,
+      rgba(255, 255, 255, 0.04) 30%,
+      rgba(255, 255, 255, 0.11) 50%,
+      rgba(255, 255, 255, 0.04) 70%
+    )
+    0 0 / 300% 100%;
+}
+
+.photo-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px 10px 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(0, 0, 0, 0.2);
+  font-size: 12.5px;
+}
+
+.photo-hint {
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.55);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.photo-hint-touch {
+  display: none;
+}
+
+@media (hover: none) {
+  .photo-hint-mouse {
+    display: none;
+  }
+
+  .photo-hint-touch {
+    display: inline;
+  }
+}
+
+.photo-tools {
+  display: inline-flex;
+  flex: none;
+  gap: 8px;
+}
+
+.photo-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 12.5px;
+  font-weight: 500;
+  text-decoration: none;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.photo-tool:hover {
+  border-color: rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* ---------- the printer ---------- */
+
+.printer {
+  position: relative;
+  padding-top: 9px;
+}
+
+.printer-slot {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  right: -12px;
+  left: -12px;
+  height: 18px;
+  border-radius: 9px;
+  background: linear-gradient(#3e3e46, #19191e 72%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 8px 14px -8px rgba(0, 0, 0, 0.6);
+}
+
+/* The slit the paper comes out of. */
+.printer-slot::after {
+  content: '';
+  position: absolute;
+  top: 8px;
+  right: 14px;
+  left: 14px;
+  height: 3px;
+  border-radius: 2px;
+  background: #060607;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* Paper above the slit is still inside the printer. The negative insets leave room for shadows. */
+.printer-out {
+  min-height: 10px;
+  clip-path: inset(0 -60px -80px -60px);
+}
+
+.printer-paper {
+  filter: drop-shadow(0 1px 1px var(--paper-shadow)) drop-shadow(0 12px 20px var(--paper-shadow));
+}
+
+/* ---------- the slip ---------- */
+
+.slip {
+  --tooth-w: 14px;
+  --tooth-h: 7px;
+
+  height: auto;
+  padding: calc(var(--tooth-h) + 22px) 24px calc(var(--tooth-h) + 20px);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.slip-head {
+  padding-bottom: 14px;
+  text-align: center;
+}
+
+.slip-file {
+  margin: 8px 0 0;
+  overflow: hidden;
+  color: var(--paper-ink-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slip-section {
+  padding: 14px 0;
+  border-top: 1px dashed var(--paper-rule);
+}
+
+/* The double rule a till prints above the total. */
+.slip-section-total {
+  border-top: 3px double var(--paper-rule);
+}
+
+.slip-caption {
+  margin: 0 0 8px;
+  color: var(--paper-ink-muted);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.slip-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.slip-label {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  color: var(--paper-ink-muted);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Label, dotted leader, value: the way a till prints a line. */
+.slip-label::after {
+  content: '';
+  flex: 1;
+  min-width: 14px;
+  border-bottom: 1px dotted var(--paper-rule);
+}
+
+.slip-lines {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+}
+
+/* Lined up with the text inside the inputs above and below. */
+.slip-value {
+  margin: 0;
+  padding-right: 10px;
+  white-space: nowrap;
+}
+
+.slip-muted {
+  margin: 0;
+  color: var(--paper-ink-muted);
+  font-size: 12px;
+}
+
+/* An editable value: a faint box with a dashed rule, so it reads as "fill this in". */
+.slip-input {
+  flex: none;
+  width: 10.5em;
+  min-width: 0;
+  padding: 4px 8px;
+  border: 0;
+  border-bottom: 1.5px dashed color-mix(in srgb, var(--paper-ink) 30%, transparent);
+  border-radius: 6px 6px 2px 2px;
+  background: color-mix(in srgb, var(--paper-ink) 4.5%, transparent);
+  color: var(--paper-ink);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.slip-input::placeholder {
+  color: color-mix(in srgb, var(--paper-ink) 35%, transparent);
+}
+
+.slip-input:hover {
+  background: color-mix(in srgb, var(--paper-ink) 8%, transparent);
+}
+
+/* Being edited: a swipe of highlighter, and the rule turns solid. */
+.slip-input:focus,
+.slip-input:focus-visible {
+  border-bottom: 2px solid var(--accent);
+  outline: none;
+  background: var(--paper-highlight);
+}
+
+.slip-input[readonly] {
+  cursor: progress;
+}
+
+.slip-input::-webkit-calendar-picker-indicator {
+  margin-left: 2px;
+  cursor: pointer;
+  opacity: 0.5;
+}
+
+.slip-input::-webkit-calendar-picker-indicator:hover {
+  opacity: 0.9;
+}
+
+/* A correction is written in pen. */
+.slip-field[data-changed] .slip-input {
+  color: var(--paper-pen);
+  font-weight: 600;
+}
+
+.slip-field[data-invalid] .slip-input {
+  border-bottom: 2px solid var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+
+/* Focus still shows on a flagged field; the red rule keeps saying what's wrong. */
+.slip-field[data-invalid] .slip-input:focus {
+  background: var(--paper-highlight);
+}
+
+/* The model couldn't read this one: an amber rule asks for it to be filled in. */
+.slip-field[data-unread] .slip-input:not(:focus) {
+  border-bottom-color: #d48a1c;
+  background: color-mix(in srgb, #e8a33d 12%, transparent);
+}
+
+.slip-hint {
+  margin: 6px 0 0;
+  color: #9a5c00;
+  font-size: 11.5px;
+  text-align: right;
+}
+
+.slip-field[data-variant='merchant'] .slip-hint {
+  text-align: center;
+}
+
+.slip-note {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 10px;
+  margin: 6px 0 0;
+  color: var(--paper-ink-muted);
+  font-size: 11.5px;
+}
+
+.slip-note s {
+  text-decoration-color: color-mix(in srgb, var(--danger) 75%, transparent);
+  text-decoration-thickness: 1.5px;
+}
+
+.slip-undo {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--paper-pen);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.slip-undo:hover {
+  text-decoration-thickness: 2px;
+}
+
+.slip-error {
+  margin: 6px 0 0;
+  color: var(--danger);
+  font-size: 12px;
+  text-align: right;
+}
+
+/* The merchant is the slip's heading: centred and large, with its label above. */
+.slip-field[data-variant='merchant'] .slip-line {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.slip-field[data-variant='merchant'] .slip-label {
+  justify-content: center;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+}
+
+.slip-field[data-variant='merchant'] .slip-label::after {
+  display: none;
+}
+
+.slip-field[data-variant='merchant'] .slip-input {
+  width: 100%;
+  padding: 6px 10px;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-align: center;
+}
+
+.slip-field[data-variant='merchant'] .slip-note {
+  justify-content: center;
+}
+
+.slip-field[data-variant='merchant'] .slip-error {
+  text-align: center;
+}
+
+.slip-field[data-variant='total'] .slip-label {
+  color: var(--paper-ink);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+}
+
+.slip-prefix {
+  margin-right: -6px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.slip-field[data-variant='total'] .slip-input {
+  width: 7.4em;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.slip-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--paper-rule);
+  color: var(--paper-ink-muted);
+  font-size: 11px;
+}
+
+.slip-foot .slip-file {
+  margin: 0;
+}
+
+/* ---------- confidence ---------- */
+
+.confidence {
+  --level: var(--paper-ink-muted);
+}
+
+.confidence[data-level='high'] {
+  --level: #2b8a3e;
+}
+
+.confidence[data-level='medium'] {
+  --level: #b06d09;
+}
+
+.confidence[data-level='low'] {
+  --level: #c92a2a;
+}
+
+.confidence-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0;
+  color: var(--paper-ink-muted);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.confidence-value {
+  color: var(--level);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.confidence-bar {
+  display: grid;
+  grid-template-columns: repeat(20, 1fr);
+  gap: 3px;
+  margin: 9px 0 8px;
+}
+
+.confidence-bar span {
+  height: 12px;
+  border-radius: 1.5px;
+  background: color-mix(in srgb, var(--paper-ink) 9%, transparent);
+}
+
+.confidence-bar span[data-lit] {
+  background: var(--level);
+}
+
+.confidence-advice {
+  margin: 0;
+  color: var(--paper-ink-muted);
+  font-size: 12px;
+}
+
+/* ---------- the stamp ---------- */
+
+.slip-model {
+  position: relative;
+}
+
+/* Rubber-stamp ink: speckled where the stamp didn't quite take, drawn with SVG noise as a mask.
+   Centred a little left of the middle of the breakdown, over labels and leaders, never a number. */
+.stamp {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 42%;
+  translate: -50% -50%;
+  padding: 8px 14px 7px;
+  border: 3px solid currentColor;
+  border-radius: 10px;
+  outline: 1.5px solid currentColor;
+  outline-offset: 3px;
+  color: var(--stamp-ink);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  opacity: 0.86;
+  transform: rotate(-11deg);
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' seed='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -3.2 2.45'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' seed='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -3.2 2.45'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ---------- slips for receipts that can't be reviewed yet ---------- */
+
+.slip-short {
+  text-align: center;
+}
+
+.slip-short-title {
+  margin: 0 0 14px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.slip-short .slip-foot {
+  margin-top: 16px;
+}
+
+.slip-dots {
+  display: inline-block;
+  width: 3ch;
+  text-align: left;
+}
+
+.slip-dots::after {
+  content: '...';
+}
+
+.slip-skeleton {
+  display: grid;
+  justify-items: center;
+  gap: 9px;
+  margin: 0 0 16px;
+}
+
+.slip-skeleton span {
+  width: 100%;
+  height: 9px;
+  border-radius: 2px;
+  background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--paper-ink) 7%, transparent) 30%,
+      color-mix(in srgb, var(--paper-ink) 15%, transparent) 50%,
+      color-mix(in srgb, var(--paper-ink) 7%, transparent) 70%
+    )
+    0 0 / 300% 100%;
+}
+
+.slip-skeleton span:nth-child(2) {
+  width: 72%;
+}
+
+.slip-skeleton span:nth-child(3) {
+  width: 86%;
+}
+
+.slip-skeleton span:nth-child(4) {
+  width: 54%;
+}
+
+/* ---------- actions and messages ---------- */
+
+.review-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.review-skip {
+  padding: 6px 2px;
+  color: var(--text-muted);
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.review-skip:hover {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.review-caught-up {
+  color: var(--success);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.review-primary {
+  min-width: 196px;
+  padding: 12px 22px;
+  border-radius: 12px;
+  font-size: 15px;
+}
+
+.spinner {
+  width: 15px;
+  height: 15px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+.review-notice {
+  padding: 12px 14px;
+  border: 1px solid;
+  border-radius: 12px;
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+.review-notice[data-tone='success'] {
+  border-color: color-mix(in srgb, var(--success) 30%, transparent);
+  background: var(--success-soft);
+}
+
+.review-notice[data-tone='warning'] {
+  border-color: color-mix(in srgb, var(--warning) 30%, transparent);
+  background: var(--warning-soft);
+}
+
+.review-notice[data-tone='error'] {
+  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+  background: var(--danger-soft);
+}
+
+.review-notice-title {
+  margin: 0;
+  font-weight: 600;
+}
+
+.review-notice[data-tone='success'] .review-notice-title {
+  color: var(--success);
+}
+
+.review-notice[data-tone='warning'] .review-notice-title {
+  color: var(--warning);
+}
+
+.review-notice[data-tone='error'] .review-notice-title {
+  color: var(--danger);
+}
+
+.review-notice-detail {
+  margin: 2px 0 0;
+  color: var(--text-muted);
+}
+
+.review-problem {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* ---------- motion ---------- */
+
+@media (prefers-reduced-motion: no-preference) {
+  /* The slip feeds out of the printer: it starts inside, above the slit, and slides down. */
+  .printer-paper {
+    animation: print-out 0.9s cubic-bezier(0.3, 0.7, 0.25, 1) both;
+  }
+
+  /* The confidence meter prints segment by segment once the slip is out. */
+  .confidence-bar {
+    animation: meter-print 0.6s steps(20, end) 0.55s both;
+  }
+
+  .stamp[data-landing] {
+    animation: stamp-land 0.42s cubic-bezier(0.25, 0.9, 0.35, 1.25) both;
+  }
+
+  .slip-dots::after {
+    animation: dots 1.2s steps(4, end) infinite;
+  }
+
+  .photo-loading-paper,
+  .slip-skeleton span {
+    animation: shimmer 1.4s linear infinite;
+  }
+}
+
+@keyframes print-out {
+  from {
+    transform: translateY(-100%);
+  }
+}
+
+@keyframes meter-print {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+
+  to {
+    clip-path: inset(0);
+  }
+}
+
+@keyframes stamp-land {
+  0% {
+    opacity: 0;
+    transform: rotate(-11deg) scale(2.3);
+  }
+
+  60% {
+    opacity: 0.95;
+    transform: rotate(-11deg) scale(0.95);
+  }
+
+  100% {
+    opacity: 0.86;
+    transform: rotate(-11deg) scale(1);
+  }
+}
+
+@keyframes dots {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+
+  to {
+    clip-path: inset(0);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: 0 0;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- smaller screens ---------- */
+
+@media (max-width: 880px) {
+  .review-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+
+  .photo {
+    position: relative;
+    top: 0;
+    height: min(64vh, 560px);
+    min-height: 340px;
+  }
+
+  .review-side {
+    width: 100%;
+    max-width: 440px;
+    margin: 0 auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .review-title {
+    font-size: 22px;
+  }
+
+  .slip {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .photo-viewport {
+    padding: 14px;
+  }
+
+  .photo-hint {
+    display: none;
+  }
+
+  .photo-bar {
+    justify-content: flex-end;
+  }
+
+  .review-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .review-skip,
+  .review-caught-up {
+    text-align: center;
+  }
+}

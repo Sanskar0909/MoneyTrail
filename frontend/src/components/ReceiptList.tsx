@@ -1,5 +1,7 @@
 import type { Receipt, ReceiptStatus } from '../api';
 import { formatDate, formatMoney, formatTimestamp } from '../format';
+import { reviewHref } from '../hooks/useRoute';
+import { ArrowRightIcon } from './icons';
 import { StatusBadge } from './StatusBadge';
 
 interface ReceiptListProps {
@@ -11,6 +13,8 @@ interface ReceiptListProps {
 }
 
 export function ReceiptList({ receipts, isLoading, isPolling, error, onRefresh }: ReceiptListProps) {
+  const waiting = receipts.filter((receipt) => receipt.status === 'NEEDS_REVIEW');
+
   return (
     <section className="receipts" aria-labelledby="receipts-heading">
       <div className="panel-header">
@@ -30,6 +34,18 @@ export function ReceiptList({ receipts, isLoading, isPolling, error, onRefresh }
         <p className="feedback feedback-error" role="alert">
           {error}
         </p>
+      )}
+
+      {waiting.length > 0 && (
+        <div className="queue-callout">
+          <p>
+            <strong>{waiting.length}</strong> {waiting.length === 1 ? 'receipt is' : 'receipts are'} waiting
+            for you to check.
+          </p>
+          <a className="button-primary" href={reviewHref(waiting[0].id)}>
+            Start reviewing <ArrowRightIcon />
+          </a>
+        </div>
       )}
 
       {!error && receipts.length === 0 && !isLoading && (
@@ -64,6 +80,10 @@ const UNREAD_MERCHANT: Record<ReceiptStatus, string> = {
  *
  * The torn edges are a CSS mask on `.receipt-paper`. The drop shadow lives on the parent `<li>`
  * because a mask clips anything painted outside the element, shadows included.
+ *
+ * The whole slip opens the review screen, but only the merchant name is the link: its `::after`
+ * is stretched over the slip in CSS. Wrapping the whole slip in `<a>` would make a screen reader
+ * read every line of it as the link's name.
  */
 function ReceiptSlip({ receipt }: { receipt: Receipt }) {
   const isUnread = receipt.merchantName === null;
@@ -73,7 +93,9 @@ function ReceiptSlip({ receipt }: { receipt: Receipt }) {
     <article className="receipt-paper" aria-labelledby={titleId}>
       <header className="receipt-head">
         <h3 id={titleId} className="receipt-merchant" data-unread={isUnread || undefined}>
-          {receipt.merchantName ?? UNREAD_MERCHANT[receipt.status]}
+          <a className="receipt-link" href={reviewHref(receipt.id)}>
+            {receipt.merchantName ?? UNREAD_MERCHANT[receipt.status]}
+          </a>
         </h3>
         <p className="receipt-file" title={receipt.originalFilename}>
           {receipt.originalFilename}
