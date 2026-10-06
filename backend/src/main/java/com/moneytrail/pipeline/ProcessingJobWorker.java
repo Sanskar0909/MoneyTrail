@@ -64,25 +64,55 @@ public class ProcessingJobWorker {
             return;
         }
 
-        byte[] image;
-        try (InputStream inputStream = fileStorageClient.getObject(receipt.getStorageKey())) {
-            image = inputStream.readAllBytes();
-        } catch (IOException e) {
-            throw new StorageException("Could not read image " + receipt.getStorageKey(), e);
-        }
-
+        // Reading the image and calling the model share one catch: from the job's point of view
+        // "storage was down" and "the model broke" are the same event — this attempt produced
+        // nothing, so wait and try again.
         long start = System.nanoTime();
-        ExtractionResult extractionResult = receiptExtractionClient.processImage(image, receipt.getContentType());
-        int durationMs = (int) ((System.nanoTime() - start) / 1_000_000);
+        try {
+            byte[] image = downloadImage(receipt.getStorageKey());
+            ExtractionResult extractionResult =
+                    receiptExtractionClient.processImage(image, receipt.getContentType());
+            int durationMs = elapsedMs(start);
 
-        boolean updated = processingJobWorkerMapping.mapChanges(jobId, receipt.getId(),
-                job.getAttemptCount(), extractionResult,
-                receiptExtractionClient.provider(), receiptExtractionClient.model(), durationMs);
+            boolean updated = processingJobWorkerMapping.mapChanges(jobId, receipt.getId(),
+                    job.getAttemptCount(), extractionResult,
+                    receiptExtractionClient.provider(), receiptExtractionClient.model(), durationMs);
 
-        if (updated) {
-            log.info("Job {} finished: receipt {} is ready for review ({} ms)", jobId, receipt.getId(), durationMs);
-        } else {
-            log.info("Job {} discarded: receipt {} changed while the extraction was running", jobId, receipt.getId());
+            if (updated) {
+                log.info("Job {} finished: receipt {} is ready for review ({} ms)", jobId, receipt.getId(), durationMs);
+            } else {
+                log.info("Job {} discarded: receipt {} changed while the extraction was running", jobId, receipt.getId());
+            }
+        } catch (Exception e) {
+            String error = describe(e);
+            boolean willRetry = processingJobWorkerMapping.mapFailure(jobId, receipt.getId(),
+                    job.getAttemptCount(),
+                    receiptExtractionClient.provider(), receiptExtractionClient.model(),
+                    error, elapsedMs(start));
+
+            if (willRetry) {
+                log.warn("Job {} attempt {} failed, will retry: {}", jobId, job.getAttemptCount(), error);
+            } else {
+                log.error("Job {} failed permanently after {} attempts: {}", jobId, job.getAttemptCount(), error);
+            }
         }
+    }
+
+    /** try-with-resources closes the MinIO download even if reading throws. */
+    private byte[] downloadImage(String storageKey) {
+        try (InputStream inputStream = fileStorageClient.getObject(storageKey)) {
+            return inputStream.readAllBytes();
+        } catch (IOException e) {
+            throw new StorageException("Could not read image " + storageKey, e);
+        }
+    }
+
+    private int elapsedMs(long startNanos) {
+        return (int) ((System.nanoTime() - startNanos) / 1_000_000);
+    }
+
+    /** getMessage() alone is often null or bare; the class name is what makes last_error readable. */
+    private String describe(Exception e) {
+        return e.getClass().getSimpleName() + ": " + e.getMessage();
     }
 }

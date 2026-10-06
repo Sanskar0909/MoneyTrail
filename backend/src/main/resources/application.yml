@@ -1,6 +1,9 @@
 spring:
   application:
     name: moneytrail
+  config:
+    # Loads backend/.env when present. Optional, so the app still starts without it.
+    import: optional:file:./.env[.properties]
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:moneytrail}
     username: ${DB_USER:moneytrail}
@@ -36,8 +39,16 @@ moneytrail:
   upload:
     allowed-content-types: image/jpeg,image/png,image/heic,application/pdf
     max-file-size-bytes: 15728640
+  extraction:
+    # 'stub' returns fixed values and needs no API key; 'gemini' calls the real API.
+    provider: ${EXTRACTION_PROVIDER:gemini}
+    gemini:
+      api-key: ${GEMINI_API_KEY:}
+      model: ${GEMINI_MODEL:gemini-3.8-flash}
+      timeout: 60s
   pipeline:
     job-poll-interval-ms: 5000
+    retry-base-delay: 30s
     batch-size: 5              # jobs claimed per poll; keep at or below the worker pool's capacity
     lease-duration: 5m         # a RUNNING job untouched for this long is presumed abandoned and reclaimed
     auto-confirm-threshold: 1.1 # >1.0 means "never auto-confirm" (per MVP review policy); tune down later once extraction is trusted

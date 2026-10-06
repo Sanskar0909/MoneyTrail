@@ -20,5 +20,6 @@ public record PipelineProperties(
         long jobPollIntervalMs,
         int batchSize,
         Duration leaseDuration,
+        Duration retryBaseDelay,
         BigDecimal autoConfirmThreshold) {
 }

@@ -1,11 +1,13 @@
 package com.moneytrail.receipt;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Component
+@ConditionalOnProperty(name = "moneytrail.extraction.provider", havingValue = "stub", matchIfMissing = true)
 public class StubReceiptExtractionClient implements ReceiptExtractionClient {
     @Override
     public ExtractionResult processImage(byte[] image, String contentType) {
