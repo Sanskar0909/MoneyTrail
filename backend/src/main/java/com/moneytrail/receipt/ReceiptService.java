@@ -40,17 +40,23 @@ public class ReceiptService {
     private final ReceiptRepository receiptRepository;
     private final CurrentUserProvider currentUserProvider;
     private final ReceiptCreationService receiptCreationService;
+    private final ReceiptExtractionRepository receiptExtractionRepository;
+    private final ReceiptStateMachineService receiptStateMachineService;
 
     public ReceiptService(UploadProperties uploadProperties,
                           FileStorageClient fileStorageClient,
                           ReceiptRepository receiptRepository,
                           CurrentUserProvider currentUserProvider,
-                          ReceiptCreationService receiptCreationService) {
+                          ReceiptCreationService receiptCreationService,
+                          ReceiptExtractionRepository receiptExtractionRepository,
+                          ReceiptStateMachineService receiptStateMachineService) {
         this.uploadProperties = uploadProperties;
         this.fileStorageClient = fileStorageClient;
         this.receiptRepository = receiptRepository;
         this.currentUserProvider = currentUserProvider;
         this.receiptCreationService = receiptCreationService;
+        this.receiptExtractionRepository = receiptExtractionRepository;
+        this.receiptStateMachineService = receiptStateMachineService;
     }
 
     /**
@@ -143,5 +149,85 @@ public class ReceiptService {
         } catch (RuntimeException e) {
             log.warn("Orphaned object left in storage at key {} after a failed insert", storageKey, e);
         }
+    }
+
+    @Transactional(readOnly = true)
+    public ReceiptDetailResponse getReceipt(Long receiptId) {
+        Receipt receipt = requireOwnedReceipt(receiptId);
+
+        return ReceiptDetailResponse.from(receipt, receiptExtractionRepository.findFirstByReceiptIdAndParsedSuccessfullyTrueOrderByAttemptNumberDesc(receiptId));
+    }
+
+    public ReceiptImage getReceiptImage(Long receiptId) {
+        Receipt receipt = requireOwnedReceipt(receiptId);
+
+        ReceiptImage receiptImage = null;
+        try(InputStream inputStream = fileStorageClient.getObject(receipt.getStorageKey())) {
+            byte[] allBytes = inputStream.readAllBytes();
+            receiptImage = new ReceiptImage(allBytes, receipt.getContentType());
+        } catch (IOException e) {
+            throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Couldn't read the receipt");
+        }
+
+        return receiptImage;
+    }
+
+    @Transactional
+    public ReceiptDetailResponse updateReceipt(Long receiptId, ReceiptUpdateRequest receiptUpdateRequest) {
+        Receipt receipt = requireOwnedReceipt(receiptId);
+
+        if (receipt.getStatus() != ReceiptStatus.NEEDS_REVIEW && receipt.getStatus() != ReceiptStatus.CONFIRMED) {
+            throw new ApiException(HttpStatus.CONFLICT,
+                    "This receipt cannot be edited while it is " + receipt.getStatus());
+        }
+
+        if(receipt.getStatus() == ReceiptStatus.CONFIRMED) {
+            receiptStateMachineService.transition(receipt.getId(), receipt.getStatus(), ReceiptStatus.NEEDS_REVIEW);
+            receipt = requireOwnedReceipt(receiptId);
+        }
+
+        if(receiptUpdateRequest.receiptDate() != null)  receipt.setReceiptDate(receiptUpdateRequest.receiptDate());
+        if(receiptUpdateRequest.merchantName() != null) receipt.setMerchantName(receiptUpdateRequest.merchantName());
+        if(receiptUpdateRequest.totalAmount() != null)  receipt.setTotalAmount(receiptUpdateRequest.totalAmount());
+
+
+        return ReceiptDetailResponse.from(receipt, receiptExtractionRepository.findFirstByReceiptIdAndParsedSuccessfullyTrueOrderByAttemptNumberDesc(receiptId));
+    }
+
+    /**
+     * Marks a reviewed receipt as correct.
+     *
+     * <p>The status change is a compare-and-swap, so if the receipt moved on while the review
+     * screen was open — another tab confirmed it, or a worker changed it — this reports a conflict
+     * rather than silently re-confirming something that is no longer in review.
+     */
+    @Transactional
+    public ReceiptDetailResponse confirmReceipt(Long receiptId) {
+        Receipt receipt = requireOwnedReceipt(receiptId);
+
+        if (receipt.getTotalAmount() == null) {
+            throw new ApiException(HttpStatus.CONFLICT, "Add a total before confirming this receipt.");
+        }
+
+        boolean confirmed = receiptStateMachineService.transition(
+                receiptId, ReceiptStatus.NEEDS_REVIEW, ReceiptStatus.CONFIRMED);
+        if (!confirmed) {
+            throw new ApiException(HttpStatus.CONFLICT,
+                    "This receipt is no longer waiting for review. Reload it and try again.");
+        }
+
+        // Reloaded because the transition cleared the persistence context: the instance above is
+        // detached now, so changes to it would not be saved and its status would be stale.
+        Receipt confirmedReceipt = requireOwnedReceipt(receiptId);
+        confirmedReceipt.setConfirmedAt(Instant.now());
+
+        return ReceiptDetailResponse.from(confirmedReceipt,
+                receiptExtractionRepository.findFirstByReceiptIdAndParsedSuccessfullyTrueOrderByAttemptNumberDesc(receiptId));
+    }
+
+    private Receipt requireOwnedReceipt(Long receiptId) {
+        return receiptRepository.findById(receiptId)
+                .filter(r -> r.getOwnerId().equals(currentUserProvider.currentUserId()))
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Receipt not found."));
     }
 }

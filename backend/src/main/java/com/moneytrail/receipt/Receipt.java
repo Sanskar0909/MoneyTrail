@@ -52,4 +52,7 @@ public class Receipt {
 
     @Column(nullable = false)
     private Instant uploadedAt;
+
+    /** Set when the user confirms the receipt. Null until then. */
+    private Instant confirmedAt;
 }

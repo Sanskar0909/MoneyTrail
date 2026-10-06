@@ -1,15 +1,14 @@
 package com.moneytrail.receipt;
 
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/receipts")
@@ -30,5 +29,29 @@ public class ReceiptController {
     @GetMapping
     public List<ReceiptResponse> listReceipts() {
         return receiptService.listReceipts();
+    }
+
+    @GetMapping("/{id}")
+    public ReceiptDetailResponse getReceipt(@PathVariable("id") Long receiptId) {
+        return receiptService.getReceipt(receiptId);
+    }
+
+    @GetMapping("/{id}/image")
+    public ResponseEntity<byte[]> getReceiptImage(@PathVariable("id") Long receiptId) {
+        ReceiptImage receiptImage = receiptService.getReceiptImage(receiptId);
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(receiptImage.contentType()))
+                .body(receiptImage.image());
+    }
+
+    @PatchMapping("/{id}")
+    public ReceiptDetailResponse updateReceipt(@PathVariable("id") Long receiptId, @RequestBody ReceiptUpdateRequest receiptUpdateRequest) {
+        return receiptService.updateReceipt(receiptId, receiptUpdateRequest);
+    }
+
+    @PostMapping("/{id}/confirm")
+    public ReceiptDetailResponse confirmReceipt(@PathVariable("id") Long receiptId) {
+        return receiptService.confirmReceipt(receiptId);
     }
 }
