@@ -11,6 +11,19 @@
   --radius: 10px;
   --shadow: 0 1px 2px rgba(16, 16, 24, 0.05), 0 4px 12px rgba(16, 16, 24, 0.04);
 
+  /* Outcome colours, for notices and callouts. */
+  --success: #2b8a3e;
+  --success-soft: rgba(47, 158, 68, 0.11);
+  --warning: #9c5f06;
+  --warning-soft: rgba(232, 163, 61, 0.14);
+
+  /* The primary button is printed in ink, like the receipts, so colour stays free for meaning. */
+  --ink: #1d1c21;
+  --on-ink: #fbfaf6;
+
+  /* What the original photo sits on. Dark in both themes, as in any photo viewer. */
+  --lightbox: #1c1c21;
+
   /* Receipt paper. Slightly warm, like thermal till roll, so it reads as paper on a white panel. */
   --paper: #fdfcf8;
   --paper-ink: #1c1b18;
@@ -18,6 +31,12 @@
   --paper-rule: #c9c6bd;
   --paper-shadow: rgba(16, 16, 24, 0.14);
   --font-receipt: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Marks made on the paper: highlighter on the field being edited, blue pen for a correction,
+     and the rubber stamp that lands on a confirmed receipt. */
+  --paper-highlight: #fff1a1;
+  --paper-pen: #2443c0;
+  --stamp-ink: #1d8048;
 
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   font-size: 15px;
@@ -40,12 +59,23 @@
     --danger-soft: rgba(255, 135, 135, 0.12);
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.2);
 
+    --success: #69db7c;
+    --success-soft: rgba(105, 219, 124, 0.12);
+    --warning: #f0b95e;
+    --warning-soft: rgba(240, 185, 94, 0.12);
+
+    --ink: #ececf1;
+    --on-ink: #141417;
+
+    --lightbox: #0b0b0e;
+
     /* Paper stays paper in the dark: a real receipt on a dark desk, dimmed so it doesn't glare. */
     --paper: #e9e6de;
     --paper-ink: #1c1b18;
     --paper-ink-muted: #5f5c55;
     --paper-rule: #b6b2a8;
     --paper-shadow: rgba(0, 0, 0, 0.5);
+    --paper-highlight: #f0de85;
   }
 }
 

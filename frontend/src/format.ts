@@ -22,6 +22,32 @@ export function formatMoney(amount: number | null, currency: string): string {
   }
 }
 
+/**
+ * A plain amount, two decimals and local digit grouping — `1,224.30` — for receipt lines, where
+ * the currency is already shown once on the total.
+ */
+export function formatAmount(amount: number | null): string {
+  if (amount === null) return '—';
+  return new Intl.NumberFormat(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+/** The symbol for a currency code — `INR` → `₹` — or the code itself if the browser has none. */
+export function currencySymbol(currency: string): string {
+  try {
+    const parts = new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency,
+      currencyDisplay: 'narrowSymbol',
+    }).formatToParts(0);
+    return parts.find((part) => part.type === 'currency')?.value ?? currency;
+  } catch {
+    return currency;
+  }
+}
+
 /** ISO date (`2026-08-04`) → a short human date. */
 export function formatDate(isoDate: string | null): string {
   if (!isoDate) return '—';

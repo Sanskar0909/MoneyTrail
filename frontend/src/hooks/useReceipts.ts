@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { listReceipts, type Receipt, type ReceiptStatus } from '../api';
+import { IN_FLIGHT_STATUSES, listReceipts, type Receipt } from '../api';
 
 interface UseReceiptsResult {
   receipts: Receipt[];
@@ -12,9 +12,6 @@ interface UseReceiptsResult {
 }
 
 const POLL_INTERVAL_MS = 4000;
-
-/** Statuses the pipeline will change on its own. Everything else only changes when a person acts. */
-const IN_FLIGHT: ReadonlySet<ReceiptStatus> = new Set(['UPLOADED', 'PROCESSING']);
 
 /**
  * Loads the receipt list on mount and keeps it fresh.
@@ -48,7 +45,7 @@ export function useReceipts(): UseReceiptsResult {
     return () => controller.abort();
   }, [load]);
 
-  const isPolling = receipts.some((receipt) => IN_FLIGHT.has(receipt.status));
+  const isPolling = receipts.some((receipt) => IN_FLIGHT_STATUSES.has(receipt.status));
 
   useEffect(() => {
     if (!isPolling) return;
