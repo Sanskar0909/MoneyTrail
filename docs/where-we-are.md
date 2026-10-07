@@ -129,7 +129,6 @@ All of the above has been run and watched working, not just written.
 
 ## 5. What doesn't work yet
 
-- **Reading receipts is fake.** This is the big one. Everything else is real
 - **Failed receipts are a dead end.** The server won't accept corrections to a `FAILED` receipt, so
   the review screen can only suggest uploading a better photo. Manual entry (step 5) fixes this
 - **Line items aren't stored.** The table exists; nothing fills it
@@ -141,8 +140,8 @@ All of the above has been run and watched working, not just written.
 
 ## 6. What's left, in order
 
-1. **Finish the Gemini client** — one method, `toExtractionResult`, which turns the AI's JSON into
-   an `ExtractionResult`. *This is the next thing.*
+1. ~~**Finish the Gemini client** — turn the AI's JSON into an `ExtractionResult`.~~ Done: real
+   receipts are read by Gemini.
 2. ~~**Review screen** — four endpoints (view one receipt, show its photo, save corrections,
    confirm) and the page itself.~~ Done.
 3. **Validation and line items** — store each line, check that they add up, show mismatches in the
