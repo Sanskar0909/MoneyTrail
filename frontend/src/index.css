@@ -38,6 +38,13 @@
   --paper-pen: #2443c0;
   --stamp-ink: #1d8048;
 
+  /* Charts: one colour for the data, a quiet grey for the bars around the one picked out, and
+     hairlines a step off the page for the grid. */
+  --chart: #3b5bdb;
+  --chart-quiet: #c6c6cf;
+  --chart-grid: #e6e6ea;
+  --chart-axis: #cfcfd6;
+
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   font-size: 15px;
   line-height: 1.5;
@@ -76,6 +83,13 @@
     --paper-rule: #b6b2a8;
     --paper-shadow: rgba(0, 0, 0, 0.5);
     --paper-highlight: #f0de85;
+
+    /* Not the light values inverted: each is its own step, checked against the dark page. The
+       accent itself is too light to pass as a data colour here, so the bars use a darker one. */
+    --chart: #6a82e8;
+    --chart-quiet: #3d3d47;
+    --chart-grid: #232329;
+    --chart-axis: #34343c;
   }
 }
 
@@ -95,6 +109,11 @@ h2 {
   margin: 0;
   font-weight: 600;
   letter-spacing: -0.01em;
+}
+
+a {
+  color: var(--accent);
+  text-underline-offset: 3px;
 }
 
 button {

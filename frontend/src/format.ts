@@ -67,3 +67,45 @@ export function formatTimestamp(isoInstant: string): string {
     minute: '2-digit',
   });
 }
+
+/** `2026-10` → `October 2026`. */
+export function formatMonth(month: string): string {
+  const [year, monthNumber] = month.split('-').map(Number);
+  return new Date(year, monthNumber - 1, 1).toLocaleDateString(undefined, {
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
+/** `2026-10` → `October`, `Oct` or `O`, for wherever the year is already on screen. */
+export function formatMonthName(month: string, width: 'long' | 'short' | 'narrow' = 'long'): string {
+  const [year, monthNumber] = month.split('-').map(Number);
+  return new Date(year, monthNumber - 1, 1).toLocaleDateString(undefined, { month: width });
+}
+
+/** ISO date → `Tue 7 Oct`, for a day inside a month that is already named. */
+export function formatDay(isoDate: string): string {
+  const parsed = new Date(`${isoDate}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return isoDate;
+  return parsed.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+/** An amount held in paise → `₹1,224.30`. */
+export function formatPaise(paise: number, currency: string): string {
+  return formatMoney(paise / 100, currency);
+}
+
+/** A short amount for a chart axis, where there is no room for digits: 40,000 → `₹40K`. */
+export function formatMoneyCompact(amount: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency,
+      currencyDisplay: 'narrowSymbol',
+      notation: 'compact',
+      maximumFractionDigits: 1,
+    }).format(amount);
+  } catch {
+    return String(amount);
+  }
+}

@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
+import { useId, useState, type ChangeEvent, type DragEvent } from 'react';
 import {
   ACCEPTED_CONTENT_TYPES,
   ACCEPT_ATTRIBUTE,
@@ -7,6 +7,7 @@ import {
   type Receipt,
 } from '../api';
 import { formatBytes } from '../format';
+import { reviewHref } from '../hooks/useRoute';
 
 interface UploadPanelProps {
   onUploaded: (receipt: Receipt) => void;
@@ -34,33 +35,30 @@ function findLocalProblem(file: File): string | null {
 
 export function UploadPanel({ onUploaded }: UploadPanelProps) {
   const inputId = useId();
-  const inputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [uploadedName, setUploadedName] = useState<string | null>(null);
+  const [uploaded, setUploaded] = useState<Receipt | null>(null);
 
   async function upload(file: File) {
     const problem = findLocalProblem(file);
     if (problem) {
       setError(problem);
-      setUploadedName(null);
+      setUploaded(null);
       return;
     }
 
     setIsUploading(true);
     setError(null);
-    setUploadedName(null);
+    setUploaded(null);
     try {
       const receipt = await uploadReceipt(file);
-      setUploadedName(receipt.originalFilename);
+      setUploaded(receipt);
       onUploaded(receipt);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Upload failed.');
     } finally {
       setIsUploading(false);
-      // Reset the input so selecting the same file twice still fires a change event.
-      if (inputRef.current) inputRef.current.value = '';
     }
   }
 
@@ -73,6 +71,9 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
 
   function handleChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
+    // Cleared straight away, so choosing the same file again or retaking a photo still fires a
+    // change event, whichever of the two inputs was used.
+    event.target.value = '';
     if (file) void upload(file);
   }
 
@@ -95,7 +96,6 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
         onDrop={handleDrop}
       >
         <input
-          ref={inputRef}
           id={inputId}
           className="visually-hidden"
           type="file"
@@ -104,15 +104,39 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
           onChange={handleChange}
         />
         <span className="dropzone-primary">
-          {isUploading ? 'Uploading…' : 'Drop a receipt here, or click to choose'}
+          {isUploading ? (
+            'Uploading…'
+          ) : (
+            <>
+              <span className="for-mouse">Drop a receipt here, or click to choose</span>
+              <span className="for-touch">Choose a photo or a PDF</span>
+            </>
+          )}
         </span>
         <span className="dropzone-secondary">
-          JPEG, PNG, HEIC or PDF · up to {formatBytes(MAX_FILE_SIZE_BYTES)}
+          JPEG, PNG, HEIC or PDF, up to {formatBytes(MAX_FILE_SIZE_BYTES)}
         </span>
       </label>
 
+      <label className="button-primary camera-button" data-busy={isUploading || undefined}>
+        <input
+          className="visually-hidden"
+          type="file"
+          accept="image/*"
+          capture="environment"
+          disabled={isUploading}
+          onChange={handleChange}
+        />
+        Take a photo
+      </label>
+
       <p className="feedback" role="status" aria-live="polite">
-        {uploadedName ? `Uploaded ${uploadedName}. It is queued for extraction.` : ''}
+        {uploaded && (
+          <>
+            Uploaded {uploaded.originalFilename}. It is being read now.{' '}
+            <a href={reviewHref(uploaded.id)}>Open it</a>
+          </>
+        )}
       </p>
       {error && (
         <p className="feedback feedback-error" role="alert">

@@ -93,16 +93,21 @@ after the third failure both the job and the receipt are marked `FAILED`.
 
 | File | What it's for |
 |---|---|
-| `App.tsx` | The page: the receipt list, or the review screen, depending on the URL |
-| `UploadPanel.tsx` | Drag-and-drop upload box |
-| `ReceiptList.tsx` | The receipts, drawn as paper slips. Each one opens its review |
+| `App.tsx` | The shell: the header, the navigation, and whichever page the URL asks for |
+| `AppNav.tsx` | Spending, Receipts and Add: along the top on a laptop, a tab bar on a phone |
+| `SpendingScreen.tsx` | The overview: a month's total, the year month by month, the month day by day |
+| `BarChart.tsx` | The column chart both of those use, with hover values |
+| `MonthStatement.tsx` | The month written out as one receipt: a line per merchant and a total |
+| `spending.ts` | The overview's rules: which receipts count, which day each falls on, the sums |
+| `AddScreen.tsx`, `UploadPanel.tsx` | Adding a receipt: choose a file, or take a photo on a phone |
+| `ReceiptList.tsx` | The receipts as paper slips, filed by month, with filters. Each opens its review |
 | `StatusBadge.tsx` | The coloured status label |
 | `useReceipts.ts` | Fetches the list, and re-fetches while something is processing |
 | `ReviewScreen.tsx` | The review page: photo on one side, an editable slip on the other, Confirm |
 | `ReviewSlip.tsx` | The editable slip itself, the printer it comes out of, and the stamp |
 | `ReceiptPhoto.tsx` | The original photo, with a magnifier and zoom; PDFs and HEIC handled too |
 | `ConfidenceMeter.tsx` | How sure the model was, as a meter |
-| `useRoute.ts` | Which page to show, from the `#/receipts/17` part of the URL |
+| `useRoute.ts` | Which page to show, and which month or filter, from the `#/…` part of the URL |
 | `useReceipt.ts`, `useReceiptFile.ts` | Load one receipt (re-checking while it's being read), and its photo |
 | `review.ts` | The review rules: what counts as a correction, what's valid, what gets sent |
 | `api.ts`, `format.ts` | Talking to the backend; formatting money and dates |
@@ -119,6 +124,8 @@ after the third failure both the job and the receipt are marked `FAILED`.
 - Status rules — a slow worker cannot overwrite a receipt you have already confirmed
 - A permanent log of every read attempt, successful or not
 - The web page: upload, list, live status updates
+- On a phone: it installs to the home screen, and the Add page opens the camera
+- The spending overview: confirmed receipts added up by month, by day and by merchant
 - Reviewing: open a receipt, compare it with the photo, correct merchant/date/total, confirm, and
   move on to the next one. Conflicts — a receipt confirmed in another tab, say — are caught and
   explained, and corrections are never lost to them
@@ -144,11 +151,15 @@ All of the above has been run and watched working, not just written.
    receipts are read by Gemini.
 2. ~~**Review screen** — four endpoints (view one receipt, show its photo, save corrections,
    confirm) and the page itself.~~ Done.
-3. **Validation and line items** — store each line, check that they add up, show mismatches in the
-   review screen.
-4. **Phone support** — a manifest so it installs on your home screen, and a camera button.
-5. **Manual entry** — a form, for cash spends with no receipt.
+3. ~~**Phone support** — a manifest so it installs on your home screen, and a camera button.~~ Done.
+   Installing on a real phone needs HTTPS, so that part is proven at the deploy.
+4. ~~**Spending overview** — the receipts organised by year, month and day, with charts.~~ Done. It
+   is worked out in the browser from the receipt list; a summary endpoint in SQL is the later step.
+5. **Manual entry** — a form, for cash spends with no receipt. Needs a migration and an endpoint.
 6. **Ship it** — Dockerfile, deploy, README, demo recording.
+
+If there is time: a way to retry or delete a failed receipt, validation and line items, and
+recording each correction made in review.
 
 SMS/UPI parsing was deliberately cut and belongs in the README as a future idea.
 

@@ -1,0 +1,442 @@
+.spending {
+  display: grid;
+  gap: 28px;
+}
+
+/* ---------- year ---------- */
+
+.year-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.year-stepper a,
+.year-stepper > span[aria-hidden] {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  color: var(--text);
+}
+
+.year-stepper a:hover {
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+}
+
+/* A year with nothing before or after it: the arrow stays, so the stepper doesn't jump about. */
+.year-stepper > span[aria-hidden] {
+  opacity: 0.3;
+}
+
+.year-current {
+  min-width: 48px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+/* ---------- layout ---------- */
+
+.spending-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 288px);
+  gap: 48px;
+  align-items: start;
+}
+
+.spending-main {
+  display: grid;
+  gap: 32px;
+  min-width: 0;
+}
+
+/* ---------- the month's total ---------- */
+
+.hero-month {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* The one number the page leads with. Proportional figures, not tabular: equal-width digits look
+   loose at this size, and nothing lines up underneath it. */
+.hero-figure {
+  margin: 4px 0 8px;
+  font-size: clamp(48px, 11vw, 64px);
+  font-weight: 650;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+}
+
+.hero-note {
+  max-width: 46ch;
+  margin: 0;
+  color: var(--text-muted);
+}
+
+/* ---------- charts ---------- */
+
+.chart-block {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  margin: 0;
+}
+
+.chart-block figcaption {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.chart-block h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.chart-block figcaption span {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.chart {
+  --plot-height: 176px;
+  --scale-gutter: 46px;
+
+  /* The values of the gridlines are printed to the right of the plot, in this gutter. */
+  padding-right: var(--scale-gutter);
+}
+
+.chart[data-size='short'] {
+  --plot-height: 120px;
+}
+
+.chart-plot {
+  position: relative;
+  height: var(--plot-height);
+}
+
+.chart-grid,
+.chart-bars {
+  position: absolute;
+  inset: 0;
+}
+
+/* Hairlines a step off the page, and solid: a dashed line reads as a target or a forecast. */
+.chart-gridline {
+  position: absolute;
+  right: 0;
+  left: 0;
+  border-top: 1px solid var(--chart-grid);
+}
+
+.chart-gridline[data-baseline] {
+  border-top-color: var(--chart-axis);
+}
+
+.chart-gridline span {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  margin-left: 8px;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.chart-bars {
+  display: grid;
+  grid-template-columns: repeat(var(--bars), minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chart-slot {
+  position: relative;
+  min-width: 0;
+}
+
+/* The whole column, so a short bar is as easy to point at as a tall one. */
+.chart-hit {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+/* Two thirds of its column and never more than 24px: a bar that fills its slot turns the chart
+   into a block, and the air between bars is what keeps neighbours apart. Rounded at the data end
+   only, square where it stands on the baseline. */
+.chart-bar {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: min(24px, 66%);
+  min-height: 2px;
+  transform: translateX(-50%);
+  border-radius: 4px 4px 0 0;
+  background: var(--chart);
+}
+
+/* One bar in colour, the rest grey: the chart is about the month picked, in the context of its year. */
+.chart[data-emphasis] .chart-bar {
+  background: var(--chart-quiet);
+}
+
+.chart[data-emphasis] a.chart-hit:hover .chart-bar {
+  background: color-mix(in srgb, var(--chart) 45%, var(--chart-quiet));
+}
+
+.chart[data-emphasis] .chart-hit[data-selected] .chart-bar,
+.chart[data-emphasis] a.chart-hit[data-selected]:hover .chart-bar {
+  background: var(--chart);
+}
+
+span.chart-hit:hover .chart-bar {
+  background: color-mix(in srgb, var(--chart) 80%, var(--text));
+}
+
+a.chart-hit:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+
+.chart-axis {
+  display: grid;
+  grid-template-columns: repeat(var(--bars), minmax(0, 1fr));
+  margin-top: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+/* A day's number is wider than its column on a phone, so it is allowed to spill past it. */
+.chart-axis > span {
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.chart-axis > span[data-selected] {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.tick-narrow {
+  display: none;
+}
+
+/* The exact value, on hover. In ink, like the primary button, so the chart's colour stays the
+   data's alone. */
+.chart-tip {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  gap: 1px;
+  padding: 8px 10px;
+  transform: translateX(-50%);
+  border-radius: 8px;
+  background: var(--ink);
+  color: var(--on-ink);
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: var(--shadow);
+}
+
+.chart-tip strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.chart-tip span {
+  opacity: 0.75;
+}
+
+/* Near either end the tooltip leans inward instead of hanging off the page. */
+.chart-tip[data-edge='start'] {
+  transform: translateX(-14px);
+}
+
+.chart-tip[data-edge='end'] {
+  transform: translateX(calc(-100% + 14px));
+}
+
+/* ---------- the same numbers as a table ---------- */
+
+.chart-tables summary {
+  width: fit-content;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.chart-tables summary:hover {
+  color: var(--text);
+}
+
+.chart-tables-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 24px 40px;
+  align-items: start;
+  margin-top: 16px;
+}
+
+.chart-tables table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-tables caption {
+  padding-bottom: 8px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.chart-tables th,
+.chart-tables td {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--chart-grid);
+  font-weight: 400;
+  text-align: right;
+}
+
+.chart-tables th:first-child,
+.chart-tables td:first-child {
+  text-align: left;
+}
+
+.chart-tables thead th {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.spending-footnote {
+  max-width: 60ch;
+  margin: -16px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* ---------- the month as a receipt ---------- */
+
+/* Shadow on the wrapper, as with the receipts: the torn-edge mask would clip one on the paper. */
+.statement {
+  position: sticky;
+  top: 24px;
+  filter: drop-shadow(0 1px 1px var(--paper-shadow)) drop-shadow(0 10px 20px var(--paper-shadow));
+}
+
+.statement .receipt-paper {
+  height: auto;
+}
+
+/* Each of these opts out of "at least as wide as my content", which is the default for grid and
+   flex items. Without that a long merchant name would push its amount off the edge of the paper
+   instead of being cut short with an ellipsis. */
+.statement-lines {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.statement-lines .receipt-line {
+  min-width: 0;
+}
+
+/* A merchant's name is content, not a label, so it is printed in full ink at the line's size. */
+.statement-lines dt {
+  min-width: 0;
+  color: var(--paper-ink);
+  font-size: 13px;
+  letter-spacing: 0.02em;
+}
+
+.statement-lines dt::after {
+  min-width: 12px;
+}
+
+.statement-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statement-total {
+  border-top: 1px dashed var(--paper-rule);
+}
+
+.statement-empty {
+  margin: 0;
+  padding: 18px 0;
+  color: var(--paper-ink-muted);
+  text-align: center;
+}
+
+/* ---------- nothing confirmed yet ---------- */
+
+.spending-empty {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  max-width: 560px;
+  padding: 16px 0;
+}
+
+.spending-empty h2 {
+  font-size: 20px;
+}
+
+.spending-empty p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.spending-empty .queue-callout {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.spending-empty .queue-callout p {
+  color: var(--text);
+}
+
+/* ---------- narrow screens ---------- */
+
+@media (max-width: 820px) {
+  .spending-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 36px;
+  }
+
+  .statement {
+    position: static;
+    max-width: 360px;
+  }
+}
+
+@media (max-width: 560px) {
+  /* Twelve three-letter months don't fit a phone, so the axis switches to initials. */
+  .tick-wide {
+    display: none;
+  }
+
+  .tick-narrow {
+    display: inline;
+  }
+
+  .chart {
+    --scale-gutter: 40px;
+  }
+}

@@ -10,16 +10,117 @@
 }
 
 .app-header {
-  margin-bottom: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 36px;
 }
 
-.app-header h1 {
-  font-size: 28px;
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  text-decoration: none;
 }
 
-.tagline {
-  margin: 6px 0 0;
+/* ---------- navigation ---------- */
+
+/* Along the top here; pinned to the bottom of a phone further down. */
+.app-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.app-nav a {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 9px;
   color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.app-nav a:hover {
+  color: var(--text);
+}
+
+.app-nav a[aria-current='page'] {
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+  color: var(--text);
+}
+
+/* Words are enough with this much room. The icons come back in the phone's tab bar. */
+.app-nav .icon {
+  display: none;
+}
+
+/* Adding a receipt is the one thing to do from anywhere, so it is the button among the links. */
+.app-nav .nav-add,
+.app-nav .nav-add[aria-current='page'] {
+  margin-left: 8px;
+  background: var(--ink);
+  color: var(--on-ink);
+  font-weight: 600;
+}
+
+.app-nav .nav-add:hover {
+  background: color-mix(in srgb, var(--ink) 82%, var(--accent));
+  color: var(--on-ink);
+}
+
+.app-nav .nav-add .icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+.nav-count {
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--warning-soft);
+  color: var(--warning);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+/* ---------- pages ---------- */
+
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+}
+
+.page-title {
+  font-size: 24px;
+  letter-spacing: -0.015em;
+}
+
+.page-lead {
+  max-width: 60ch;
+  margin: -12px 0 0;
+  color: var(--text-muted);
+}
+
+.receipts,
+.add {
+  display: grid;
+  gap: 24px;
 }
 
 .app-main {
@@ -38,14 +139,6 @@
   padding: 20px;
 }
 
-.panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
 .panel-heading {
   display: flex;
   align-items: center;
@@ -55,17 +148,6 @@
 
 .panel > .panel-heading {
   margin-bottom: 16px;
-}
-
-.count {
-  min-width: 22px;
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 600;
-  text-align: center;
 }
 
 /* ---------- dropzone ---------- */
@@ -134,10 +216,17 @@
 }
 
 .empty {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
   margin: 0;
   padding: 28px 0;
   text-align: center;
   color: var(--text-muted);
+}
+
+.empty p {
+  margin: 0;
 }
 
 /* ---------- buttons ---------- */
@@ -192,6 +281,48 @@
   opacity: 0.8;
 }
 
+/* Wording for the device in hand: nobody drops or clicks on a phone. */
+.for-touch {
+  display: none;
+}
+
+@media (pointer: coarse) {
+  .for-mouse {
+    display: none;
+  }
+
+  .for-touch {
+    display: inline;
+  }
+}
+
+/* Opens the phone's camera. `capture` is ignored on a laptop, where this would only be a second
+   file picker that does less than the first, so it stays hidden until the device reports that
+   its main pointer is a finger. */
+.camera-button {
+  display: none;
+}
+
+@media (pointer: coarse) {
+  .camera-button {
+    display: flex;
+    margin-top: 12px;
+    padding-block: 12px;
+    cursor: pointer;
+  }
+
+  /* The real control is the hidden input inside, so the ring is drawn on the label around it. */
+  .camera-button:focus-within {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .camera-button[data-busy] {
+    cursor: progress;
+    opacity: 0.7;
+  }
+}
+
 .icon {
   flex: none;
 }
@@ -204,7 +335,6 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px 20px;
-  margin-bottom: 24px;
   padding: 12px 12px 12px 18px;
   border: 1px solid color-mix(in srgb, var(--warning) 26%, transparent);
   border-radius: var(--radius);
@@ -220,6 +350,76 @@
 }
 
 /* ---------- receipts ---------- */
+
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filter-row a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.filter-row a:hover {
+  border-color: var(--text-muted);
+  color: var(--text);
+}
+
+.filter-row a[aria-current='true'] {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--on-ink);
+}
+
+.filter-count {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+.month-group {
+  display: grid;
+  gap: 18px;
+}
+
+.month-group + .month-group {
+  margin-top: 12px;
+}
+
+.month-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.month-title {
+  font-size: 16px;
+}
+
+.month-summary {
+  display: flex;
+  gap: 16px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.month-summary a {
+  color: var(--text);
+}
 
 /* The section has no panel: the slips sit straight on the page, like receipts on a desk. */
 .receipts-actions {
@@ -516,11 +716,82 @@
 }
 
 @media (max-width: 640px) {
+  /* Room at the bottom for the tab bar, and for the home indicator on phones that have one. */
   .app {
-    padding: 32px 16px 64px;
+    padding: 20px 16px calc(96px + env(safe-area-inset-bottom, 0px));
   }
 
-  .panel-header {
-    flex-wrap: wrap;
+  .app-header {
+    margin-bottom: 24px;
+  }
+
+  .app-nav {
+    position: fixed;
+    z-index: 20;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--border);
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    backdrop-filter: blur(12px);
+  }
+
+  .app-nav a,
+  .app-nav .nav-add,
+  .app-nav .nav-add[aria-current='page'] {
+    flex-direction: column;
+    gap: 3px;
+    margin: 0;
+    padding: 6px 4px;
+    background: none;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .app-nav a[aria-current='page'],
+  .app-nav .nav-add[aria-current='page'] {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .app-nav .icon,
+  .app-nav .nav-add .icon {
+    display: block;
+    width: 20px;
+    height: 20px;
+  }
+
+  /* The plus sits in an ink pill, so the tab for adding reads as the action among the places. */
+  .app-nav .nav-add .icon {
+    box-sizing: content-box;
+    padding: 2px 14px;
+    border-radius: 999px;
+    background: var(--ink);
+    color: var(--on-ink);
+  }
+
+  .nav-wide {
+    display: none;
+  }
+
+  .nav-count {
+    position: absolute;
+    top: 2px;
+    left: calc(50% + 6px);
+  }
+
+  /* Reviewing is a task with its own bar of actions at the bottom; two bars would fight. The way
+     out is the link back to the receipts at the top of that screen. */
+  .app[data-page='review'] {
+    padding-bottom: 64px;
+  }
+
+  .app[data-page='review'] .app-nav {
+    display: none;
   }
 }
