@@ -1,0 +1,5 @@
+# Keeps the build fast, and keeps the real API key out of every image layer.
+.env
+target/
+.idea/
+HELP.md

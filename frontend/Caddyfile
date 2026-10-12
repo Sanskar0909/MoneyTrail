@@ -1,0 +1,24 @@
+# The web server in front of the app. It serves the built frontend, hands /api to the backend,
+# and gets and renews the HTTPS certificate for SITE_ADDRESS by itself.
+{$SITE_ADDRESS} {
+	encode zstd gzip
+
+	# The app has no login of its own yet, so the whole site sits behind one password. The manifest
+	# and icons stay open because a phone fetches them without the password when installing the app.
+	@private not path /manifest.webmanifest /icon* /apple-touch-icon.png /favicon.svg
+	basic_auth @private {
+		{$BASIC_AUTH_USER} {$BASIC_AUTH_HASH}
+	}
+
+	handle /api/* {
+		reverse_proxy backend:8080
+	}
+
+	handle {
+		root * /srv
+		# Vite puts a hash of the contents in these filenames, so a browser can keep them for good.
+		@hashed path /assets/*
+		header @hashed Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+}
