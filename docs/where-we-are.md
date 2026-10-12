@@ -1,6 +1,6 @@
 # MoneyTrail — where we are
 
-Last updated: 6 October 2026. Re-read this first after a break.
+Last updated: 12 October 2026. Re-read this first after a break.
 
 ---
 
@@ -30,7 +30,8 @@ This all works right now, on your laptop:
 4. Every 5 seconds a scheduler looks in the `processing_jobs` table for work to do.
 5. It claims the job, marks it `RUNNING`, and hands it to a background thread.
 6. That worker moves the receipt to `PROCESSING`, downloads the photo, and calls the extractor.
-7. **Right now the extractor is fake.** It returns "Test Store / ₹100.00" for every photo.
+7. The extractor sends the photo to Gemini, which answers with the merchant, the date and the
+   amounts. (A fake one that needs no API key is still there for testing.)
 8. The worker saves a record of the attempt, copies the values onto the receipt, moves it to
    `NEEDS_REVIEW`, and marks the job done.
 9. The web page is polling, so the receipt changes from Uploaded to Needs review on its own.
@@ -39,6 +40,11 @@ This all works right now, on your laptop:
 
 If anything fails along the way, the job waits 30 seconds and tries again, then 60 seconds, and
 after the third failure both the job and the receipt are marked `FAILED`.
+
+There is a second, much shorter way in, for a spend with no receipt. On the Add page you fill in a
+blank slip — merchant, date, total — and it goes to `POST /api/receipts/manual`. The backend checks
+the three values and saves the entry as `CONFIRMED` straight away: no file, no job, no review. It
+counts towards spending immediately.
 
 ---
 
@@ -63,7 +69,9 @@ after the third failure both the job and the receipt are marked `FAILED`.
 |---|---|
 | `Receipt` | One row in the receipts table |
 | `ReceiptStatus` | Uploaded → Processing → Needs review → Confirmed, plus Failed |
-| `ReceiptController` | The web endpoints: upload and list, plus the four the review screen uses — one receipt, its photo, corrections, confirm |
+| `ReceiptSource` | How it got in: `UPLOAD` or `MANUAL`. The database refuses an upload with no file |
+| `ReceiptController` | The web endpoints: upload, type one in, and list, plus the four the review screen uses — one receipt, its photo, corrections, confirm |
+| `ManualEntryRequest` | An entry typed in by hand, with its rules: all three values required, date not in the future, total above zero |
 | `ReceiptDetailResponse` | One receipt for the review screen, with the model's subtotal, tax, tip and confidence |
 | `ReceiptUpdateRequest` | A correction. Fields left out (or null) keep their value |
 | `ReceiptImage` | The photo's bytes and content type, on their way out of the photo endpoint |
@@ -76,7 +84,7 @@ after the third failure both the job and the receipt are marked `FAILED`.
 | `ReceiptExtractionRepository` | Database access for those |
 | `ReceiptExtractionClient` | The interface: "give me an image, I'll give you the values" |
 | `StubReceiptExtractionClient` | The fake one, returns Test Store / ₹100 |
-| `GeminiReceiptExtractionClient` | The real one. **Unfinished — one method left** |
+| `GeminiReceiptExtractionClient` | The real one: sends the photo to Gemini and turns the answer into an `ExtractionResult` |
 | `ExtractionResult` | What the extractor hands back |
 | `ExtractionException` | What it throws when it fails |
 
@@ -100,6 +108,7 @@ after the third failure both the job and the receipt are marked `FAILED`.
 | `MonthStatement.tsx` | The month written out as one receipt: a line per merchant and a total |
 | `spending.ts` | The overview's rules: which receipts count, which day each falls on, the sums |
 | `AddScreen.tsx`, `UploadPanel.tsx` | Adding a receipt: choose a file, or take a photo on a phone |
+| `ManualEntryForm.tsx`, `entry.ts` | The blank slip for typing an entry in, and the rules it checks before saving |
 | `ReceiptList.tsx` | The receipts as paper slips, filed by month, with filters. Each opens its review |
 | `StatusBadge.tsx` | The coloured status label |
 | `useReceipts.ts` | Fetches the list, and re-fetches while something is processing |
@@ -111,6 +120,17 @@ after the third failure both the job and the receipt are marked `FAILED`.
 | `useReceipt.ts`, `useReceiptFile.ts` | Load one receipt (re-checking while it's being read), and its photo |
 | `review.ts` | The review rules: what counts as a correction, what's valid, what gets sent |
 | `api.ts`, `format.ts` | Talking to the backend; formatting money and dates |
+
+### Deploying
+
+| File | What it's for |
+|---|---|
+| `backend/Dockerfile` | Builds the jar and packs it with a Java runtime |
+| `frontend/Dockerfile`, `frontend/Caddyfile` | Builds the site and puts it in Caddy, which serves it, passes `/api` to the backend, handles HTTPS, and asks for the one site password |
+| `docker-compose.prod.yml` | The whole app on one server: database, storage, backend, web server |
+| `.env.example` | The settings the server needs. Copy to `.env` there and fill in |
+
+`docker-compose.yml` with no suffix is still the laptop setup: database and storage only.
 
 ---
 
@@ -126,6 +146,9 @@ after the third failure both the job and the receipt are marked `FAILED`.
 - The web page: upload, list, live status updates
 - On a phone: it installs to the home screen, and the Add page opens the camera
 - The spending overview: confirmed receipts added up by month, by day and by merchant
+- Typing an entry in by hand, with every bad value refused by the form and again by the server
+- The production Docker setup, built and run on the laptop with a test upload going all the way
+  through it
 - Reviewing: open a receipt, compare it with the photo, correct merchant/date/total, confirm, and
   move on to the next one. Conflicts — a receipt confirmed in another tab, say — are caught and
   explained, and corrections are never lost to them
@@ -137,11 +160,13 @@ All of the above has been run and watched working, not just written.
 ## 5. What doesn't work yet
 
 - **Failed receipts are a dead end.** The server won't accept corrections to a `FAILED` receipt, so
-  the review screen can only suggest uploading a better photo. Manual entry (step 5) fixes this
+  the review screen can only suggest uploading a better photo. You can type the spend in by hand
+  instead, but the failed receipt stays in the list: there is no retry or delete yet
 - **Line items aren't stored.** The table exists; nothing fills it
 - **Nothing checks the maths.** Whether the numbers add up isn't verified yet
 - **No login.** Everything belongs to one hardcoded user
-- **It only runs on your laptop.** Not deployed, no README
+- **It only runs on your laptop.** The Docker files are ready, but it isn't on a server yet, and
+  there is no README
 
 ---
 
@@ -155,8 +180,10 @@ All of the above has been run and watched working, not just written.
    Installing on a real phone needs HTTPS, so that part is proven at the deploy.
 4. ~~**Spending overview** — the receipts organised by year, month and day, with charts.~~ Done. It
    is worked out in the browser from the receipt list; a summary endpoint in SQL is the later step.
-5. **Manual entry** — a form, for cash spends with no receipt. Needs a migration and an endpoint.
-6. **Ship it** — Dockerfile, deploy, README, demo recording.
+5. ~~**Manual entry** — a form, for cash spends with no receipt. Needs a migration and an
+   endpoint.~~ Done.
+6. **Ship it** — ~~Dockerfile~~, then: get a server (2 GB of memory) and a domain, deploy, test on a
+   real phone over HTTPS, README, demo recording.
 
 If there is time: a way to retry or delete a failed receipt, validation and line items, and
 recording each correction made in review.

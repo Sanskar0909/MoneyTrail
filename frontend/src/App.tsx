@@ -4,6 +4,7 @@ import { AppNav } from './components/AppNav';
 import { ReceiptList } from './components/ReceiptList';
 import { ReviewScreen } from './components/ReviewScreen';
 import { SpendingScreen } from './components/SpendingScreen';
+import { isTypedIn } from './api';
 import { useReceipts } from './hooks/useReceipts';
 import { SPENDING_HREF, useRoute, type Route } from './hooks/useRoute';
 import { countWaiting, findNextToReview } from './review';
@@ -22,6 +23,7 @@ export default function App() {
   const { receipts, isLoading, isPolling, error, refresh } = useReceipts();
   const reviewingId = route.page === 'review' ? route.receiptId : null;
   const waitingCount = receipts.filter((receipt) => receipt.status === 'NEEDS_REVIEW').length;
+  const reviewing = receipts.find((receipt) => receipt.id === reviewingId);
 
   // A new page starts at the top. Without this the browser keeps the old page's scroll position.
   // Picking another month or filter is the same page, so that leaves the scroll where it is.
@@ -52,6 +54,7 @@ export default function App() {
             receiptId={route.receiptId}
             nextReceiptId={findNextToReview(receipts, route.receiptId)}
             waitingCount={countWaiting(receipts, route.receiptId)}
+            typedInHint={reviewing ? isTypedIn(reviewing) : null}
             onChanged={() => void refresh()}
           />
         )}
@@ -68,7 +71,7 @@ export default function App() {
             onRefresh={() => void refresh()}
           />
         )}
-        {route.page === 'add' && <AddScreen onUploaded={() => void refresh()} />}
+        {route.page === 'add' && <AddScreen onAdded={() => void refresh()} />}
       </main>
     </div>
   );

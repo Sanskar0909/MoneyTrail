@@ -25,7 +25,8 @@ export const EDITABLE_STATUSES: ReadonlySet<ReceiptStatus> = new Set(['NEEDS_REV
 export interface Receipt {
   id: number;
   status: ReceiptStatus;
-  originalFilename: string;
+  /** Null for an entry typed in by hand, which has no file. */
+  originalFilename: string | null;
   /** Null until the extraction pipeline has run. */
   merchantName: string | null;
   /** ISO date (`2026-08-04`), null until extracted. */
@@ -34,6 +35,16 @@ export interface Receipt {
   currency: string;
   /** ISO instant in UTC. */
   uploadedAt: string;
+}
+
+/**
+ * Whether this was typed in by hand rather than uploaded.
+ *
+ * The response has no field that says so, but the database refuses an upload without a filename,
+ * so a missing filename can only mean a typed entry.
+ */
+export function isTypedIn(receipt: Receipt): boolean {
+  return receipt.originalFilename === null;
 }
 
 /**
@@ -65,6 +76,14 @@ export interface ReceiptUpdate {
   totalAmount?: number;
 }
 
+/** An entry typed in by hand, as `ManualEntryRequest` takes it. All three are required. */
+export interface ManualEntry {
+  merchantName: string;
+  /** ISO date, `2026-08-04`. Not in the future. */
+  receiptDate: string;
+  totalAmount: number;
+}
+
 /** Mirrors `moneytrail.upload.*` in application.yml. The server is the real authority. */
 export const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024;
 
@@ -81,29 +100,39 @@ export const ACCEPT_ATTRIBUTE = [...ACCEPTED_CONTENT_TYPES, '.heic'].join(',');
 /** An error carrying the HTTP status, so callers can distinguish "bad input" from "server broke". */
 export class ApiError extends Error {
   readonly status: number;
+  /** The server's complaint about each rejected field, by field name. Empty for other failures. */
+  readonly fields: Readonly<Record<string, string>>;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, fields: Readonly<Record<string, string>> = {}) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.fields = fields;
   }
 }
 
 /**
  * The backend's GlobalExceptionHandler returns `{ message, timestamp }` for every failure, so
  * we surface `message` directly. Falls back to the status text if the body isn't what we expect.
+ * A body that failed validation also carries `fields`, one message per rejected field.
  */
-async function readErrorMessage(response: Response): Promise<string> {
+async function readError(response: Response): Promise<ApiError> {
   let message = response.statusText || `Request failed with ${response.status}`;
+  const fields: Record<string, string> = {};
   try {
     const body: unknown = await response.json();
-    if (body && typeof body === 'object' && 'message' in body && typeof body.message === 'string') {
-      message = body.message;
+    if (body && typeof body === 'object') {
+      if ('message' in body && typeof body.message === 'string') message = body.message;
+      if ('fields' in body && body.fields && typeof body.fields === 'object') {
+        for (const [field, complaint] of Object.entries(body.fields)) {
+          if (typeof complaint === 'string') fields[field] = complaint;
+        }
+      }
     }
   } catch {
     // Non-JSON error body (e.g. a proxy error page) — keep the status-based message.
   }
-  return message;
+  return new ApiError(message, response.status, fields);
 }
 
 /**
@@ -121,7 +150,7 @@ async function send(input: string, init?: RequestInit): Promise<Response> {
     throw new ApiError('Could not reach the server. Is the backend running?', 0);
   }
   if (!response.ok) {
-    throw new ApiError(await readErrorMessage(response), response.status);
+    throw await readError(response);
   }
   return response;
 }
@@ -135,6 +164,19 @@ export function uploadReceipt(file: File, signal?: AbortSignal): Promise<Receipt
   const formData = new FormData();
   formData.append('file', file);
   return request<Receipt>('/api/receipts', { method: 'POST', body: formData, signal });
+}
+
+/**
+ * Saves an entry typed in by hand. It is confirmed from the start: nothing reads it and nobody
+ * reviews it, so it counts towards spending as soon as this resolves.
+ */
+export function createManualEntry(entry: ManualEntry, signal?: AbortSignal): Promise<Receipt> {
+  return request<Receipt>('/api/receipts/manual', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(entry),
+    signal,
+  });
 }
 
 export function listReceipts(signal?: AbortSignal): Promise<Receipt[]> {

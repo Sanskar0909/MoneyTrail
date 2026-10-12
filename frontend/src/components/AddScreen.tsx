@@ -1,12 +1,14 @@
 import type { Receipt } from '../api';
+import { ManualEntryForm } from './ManualEntryForm';
 import { UploadPanel } from './UploadPanel';
 
 interface AddScreenProps {
-  onUploaded: (receipt: Receipt) => void;
+  /** Called when either way adds something, so the list and the overview can catch up. */
+  onAdded: (receipt: Receipt) => void;
 }
 
-/** Where a receipt comes into the app: photographed, or chosen as a file. */
-export function AddScreen({ onUploaded }: AddScreenProps) {
+/** Where spending comes into the app: a receipt to be read, or an entry typed in by hand. */
+export function AddScreen({ onAdded }: AddScreenProps) {
   return (
     <section className="add" aria-labelledby="add-heading">
       <div className="page-head">
@@ -15,9 +17,13 @@ export function AddScreen({ onUploaded }: AddScreenProps) {
         </h1>
       </div>
       <p className="page-lead">
-        Photograph a receipt or choose a file. It is read automatically, then waits for you to check it.
+        Photograph or upload a receipt and it is read for you, then waits for you to check it. With no
+        receipt, type the entry in.
       </p>
-      <UploadPanel onUploaded={onUploaded} />
+      <div className="add-ways">
+        <UploadPanel onUploaded={onAdded} />
+        <ManualEntryForm onSaved={onAdded} />
+      </div>
     </section>
   );
 }

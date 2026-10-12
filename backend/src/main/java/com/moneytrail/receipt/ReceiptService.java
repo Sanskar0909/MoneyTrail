@@ -4,6 +4,7 @@ import com.moneytrail.common.config.UploadProperties;
 import com.moneytrail.common.exception.ApiException;
 import com.moneytrail.storage.FileStorageClient;
 import com.moneytrail.user.CurrentUserProvider;
+import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -122,10 +123,28 @@ public class ReceiptService {
         receipt.setOwnerId(currentUserProvider.currentUserId());
         receipt.setStatus(ReceiptStatus.UPLOADED);
         receipt.setStorageKey(storageKey);
+        receipt.setSource(ReceiptSource.UPLOAD);
         receipt.setOriginalFilename(file.getOriginalFilename());
         receipt.setContentType(file.getContentType());
         receipt.setFileSizeBytes(file.getSize());
         receipt.setUploadedAt(uploadedAt);
+        return receipt;
+    }
+
+    private Receipt buildManualReceipt(ManualEntryRequest manualReceipt, Instant uploadedAt) {
+        Receipt receipt = new Receipt();
+        receipt.setOwnerId(currentUserProvider.currentUserId());
+        receipt.setStatus(ReceiptStatus.CONFIRMED);
+        receipt.setStorageKey(null);
+        receipt.setSource(ReceiptSource.MANUAL);
+        receipt.setOriginalFilename(null);
+        receipt.setContentType(null);
+        receipt.setFileSizeBytes(null);
+        receipt.setUploadedAt(uploadedAt);
+        receipt.setReceiptDate(manualReceipt.receiptDate());
+        receipt.setMerchantName(manualReceipt.merchantName());
+        receipt.setTotalAmount(manualReceipt.totalAmount());
+        receipt.setConfirmedAt(uploadedAt);
         return receipt;
     }
 
@@ -160,7 +179,9 @@ public class ReceiptService {
 
     public ReceiptImage getReceiptImage(Long receiptId) {
         Receipt receipt = requireOwnedReceipt(receiptId);
-
+        if (receipt.getStorageKey() == null) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "This entry has no image.");
+        }
         ReceiptImage receiptImage = null;
         try(InputStream inputStream = fileStorageClient.getObject(receipt.getStorageKey())) {
             byte[] allBytes = inputStream.readAllBytes();
@@ -229,5 +250,12 @@ public class ReceiptService {
         return receiptRepository.findById(receiptId)
                 .filter(r -> r.getOwnerId().equals(currentUserProvider.currentUserId()))
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Receipt not found."));
+    }
+
+    public ReceiptResponse addManualReceipt(@Valid ManualEntryRequest manualReceipt) {
+        Receipt receipt = buildManualReceipt(manualReceipt, Instant.now());
+        Receipt saved = receiptRepository.save(receipt);
+
+        return ReceiptResponse.from(saved);
     }
 }

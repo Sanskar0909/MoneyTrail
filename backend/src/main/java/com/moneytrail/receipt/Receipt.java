@@ -31,16 +31,16 @@ public class Receipt {
     @Enumerated(EnumType.STRING)
     private ReceiptStatus status;
 
-    @Column(nullable = false)
     private String storageKey;
 
-    @Column(nullable = false)
     private String originalFilename;
 
-    @Column(nullable = false)
     private String contentType;
 
     @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
+    private ReceiptSource source;
+
     private Long fileSizeBytes;
 
     private LocalDate receiptDate;

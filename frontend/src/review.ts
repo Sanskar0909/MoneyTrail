@@ -23,7 +23,7 @@ export type FieldErrors = Partial<Record<EditableField, string>>;
 export const MERCHANT_MAX_LENGTH = 255;
 
 /** The largest total `NUMERIC(12,2)` can hold, in paise. Anything bigger fails in the database. */
-const MAX_TOTAL_PAISE = 999_999_999_999;
+export const MAX_TOTAL_PAISE = 999_999_999_999;
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 

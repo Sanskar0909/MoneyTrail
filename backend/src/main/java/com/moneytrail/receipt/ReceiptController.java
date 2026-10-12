@@ -1,5 +1,6 @@
 package com.moneytrail.receipt;
 
+import jakarta.validation.Valid;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -24,6 +25,12 @@ public class ReceiptController {
     @ResponseStatus(HttpStatus.CREATED)
     public ReceiptResponse addReceipt(@RequestParam("file") MultipartFile file) {
         return receiptService.addReceipt(file);
+    }
+
+    @PostMapping("/manual")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ReceiptResponse addManualReceipt(@Valid @RequestBody ManualEntryRequest manualReceipt) {
+        return receiptService.addManualReceipt(manualReceipt);
     }
 
     @GetMapping

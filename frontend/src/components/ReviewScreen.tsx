@@ -4,6 +4,7 @@ import {
   confirmReceipt,
   EDITABLE_STATUSES,
   IN_FLIGHT_STATUSES,
+  isTypedIn,
   updateReceipt,
   type ReceiptDetail,
   type ReceiptStatus,
@@ -33,6 +34,11 @@ interface ReviewScreenProps {
   nextReceiptId: number | null;
   /** How many receipts other than this one are waiting for review. */
   waitingCount: number;
+  /**
+   * Whether the list already says this was typed in by hand, so the photo panel is never drawn
+   * for it. Null when the list doesn't know yet; the receipt itself settles it once it loads.
+   */
+  typedInHint: boolean | null;
   /** Called whenever this screen changes the receipt, so the list can catch up. */
   onChanged: () => void;
 }
@@ -70,6 +76,18 @@ const HEADINGS: Record<ReceiptStatus, { title: string; lede: string }> = {
   },
 };
 
+/** A typed entry has no photo and no model, so the headings that mention them say something else. */
+const TYPED_HEADINGS: Partial<Record<ReceiptStatus, { title: string; lede: string }>> = {
+  NEEDS_REVIEW: {
+    title: 'Check this entry',
+    lede: 'It was changed and hasn’t been confirmed since. Check it, then confirm.',
+  },
+  CONFIRMED: {
+    title: 'Entry confirmed',
+    lede: 'You typed this one in. Spotted a mistake? Correct it here and confirm again.',
+  },
+};
+
 /** Edits or errors without one field. The same object back if there was nothing to remove. */
 function without(values: Edits | FieldErrors, field: EditableField): Edits | FieldErrors {
   if (!(field in values)) return values;
@@ -84,8 +102,15 @@ function without(values: Edits | FieldErrors, field: EditableField): Edits | Fie
  *
  * Keyed by receipt in App, so moving to another receipt starts this screen afresh.
  */
-export function ReviewScreen({ receiptId, nextReceiptId, waitingCount, onChanged }: ReviewScreenProps) {
+export function ReviewScreen({
+  receiptId,
+  nextReceiptId,
+  waitingCount,
+  typedInHint,
+  onChanged,
+}: ReviewScreenProps) {
   const { receipt, error, reload, replace } = useReceipt(receiptId);
+  const typed = receipt ? isTypedIn(receipt) : (typedInHint ?? false);
   const [edits, setEdits] = useState<Edits>({});
   const [errors, setErrors] = useState<FieldErrors>({});
   const [isWorking, setIsWorking] = useState(false);
@@ -343,7 +368,13 @@ export function ReviewScreen({ receiptId, nextReceiptId, waitingCount, onChanged
               aria-disabled={isWorking || undefined}
             >
               {isWorking ? <span className="spinner" aria-hidden="true" /> : <CheckIcon />}
-              {isWorking ? 'Confirming…' : hasUnsavedChanges ? 'Save & confirm' : 'Confirm receipt'}
+              {isWorking
+                ? 'Confirming…'
+                : hasUnsavedChanges
+                  ? 'Save & confirm'
+                  : typed
+                    ? 'Confirm entry'
+                    : 'Confirm receipt'}
             </button>
           )}
         </div>
@@ -407,8 +438,8 @@ export function ReviewScreen({ receiptId, nextReceiptId, waitingCount, onChanged
           </a>
         </div>
       ) : (
-        <div className="review-layout">
-          <ReceiptPhoto receiptId={receiptId} />
+        <div className="review-layout" data-typed={typed || undefined}>
+          {!typed && <ReceiptPhoto receiptId={receiptId} />}
           <div className="review-side">{side}</div>
         </div>
       )}
@@ -421,7 +452,7 @@ export function ReviewScreen({ receiptId, nextReceiptId, waitingCount, onChanged
 }
 
 function describe(receipt: ReceiptDetail | null, error: ApiError | null): { title: string; lede: string } {
-  if (receipt) return HEADINGS[receipt.status];
+  if (receipt) return (isTypedIn(receipt) && TYPED_HEADINGS[receipt.status]) || HEADINGS[receipt.status];
   if (error?.status === 404)
     return { title: 'Receipt not found', lede: 'It may have been removed, or the link is wrong.' };
   if (error) return { title: 'Couldn’t load this receipt', lede: error.message };

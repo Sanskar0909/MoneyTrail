@@ -1,5 +1,5 @@
 import { useId, type InputHTMLAttributes, type ReactNode } from 'react';
-import type { ReceiptDetail } from '../api';
+import { isTypedIn, type ReceiptDetail } from '../api';
 import { currencySymbol, formatAmount, formatDate, formatTimestamp } from '../format';
 import {
   fieldText,
@@ -58,7 +58,19 @@ export function ReviewSlip({
 }: ReviewSlipProps) {
   const id = useId();
   const extraction = receipt.extraction;
+  const typed = isTypedIn(receipt);
   const shared = { receipt, edits, locked, onEdit, onRevert };
+
+  const stamp = receipt.status === 'CONFIRMED' && (
+    <div
+      key={confirmations}
+      className="stamp"
+      data-landing={confirmations > 0 || undefined}
+      aria-hidden="true"
+    >
+      Confirmed
+    </div>
+  );
 
   function tidyTotal() {
     // `1224.3` becomes `1224.30` once the person moves on, so the field shows exactly what will
@@ -81,8 +93,8 @@ export function ReviewSlip({
           unreadHint="Not read. Type it in from the photo."
           inputProps={{ type: 'text', maxLength: MERCHANT_MAX_LENGTH, placeholder: 'Merchant name' }}
         />
-        <p className="slip-file" title={receipt.originalFilename}>
-          {receipt.originalFilename}
+        <p className="slip-file" title={receipt.originalFilename ?? undefined}>
+          {typed ? 'Typed in by hand' : receipt.originalFilename}
         </p>
       </header>
 
@@ -97,32 +109,28 @@ export function ReviewSlip({
         />
       </div>
 
-      {/* The stamp sits over this section's labels, where it can't hide a number. */}
-      <section className="slip-section slip-model" aria-labelledby={`${id}-model`}>
-        <h3 id={`${id}-model`} className="slip-caption">
-          As read by the model
-        </h3>
-        {extraction ? (
-          <dl className="slip-lines">
-            <ModelLine label="Subtotal" amount={extraction.subtotal} />
-            <ModelLine label="Tax" amount={extraction.tax} />
-            <ModelLine label="Tip" amount={extraction.tip} />
-          </dl>
-        ) : (
-          <p className="slip-muted">There’s no reading from the model for this receipt.</p>
-        )}
+      {typed ? (
+        // Nothing was read, so there is no breakdown to print: only room for the stamp.
+        stamp && <div className="slip-section slip-model slip-stamp-only">{stamp}</div>
+      ) : (
+        // The stamp sits over this section's labels, where it can't hide a number.
+        <section className="slip-section slip-model" aria-labelledby={`${id}-model`}>
+          <h3 id={`${id}-model`} className="slip-caption">
+            As read by the model
+          </h3>
+          {extraction ? (
+            <dl className="slip-lines">
+              <ModelLine label="Subtotal" amount={extraction.subtotal} />
+              <ModelLine label="Tax" amount={extraction.tax} />
+              <ModelLine label="Tip" amount={extraction.tip} />
+            </dl>
+          ) : (
+            <p className="slip-muted">There’s no reading from the model for this receipt.</p>
+          )}
 
-        {receipt.status === 'CONFIRMED' && (
-          <div
-            key={confirmations}
-            className="stamp"
-            data-landing={confirmations > 0 || undefined}
-            aria-hidden="true"
-          >
-            Confirmed
-          </div>
-        )}
-      </section>
+          {stamp}
+        </section>
+      )}
 
       <div className="slip-section slip-section-total">
         <SlipField
@@ -138,14 +146,17 @@ export function ReviewSlip({
         />
       </div>
 
-      <div className="slip-section">
-        <ConfidenceMeter score={extraction?.confidenceScore ?? null} />
-      </div>
+      {!typed && (
+        <div className="slip-section">
+          <ConfidenceMeter score={extraction?.confidenceScore ?? null} />
+        </div>
+      )}
 
       <footer className="slip-foot">
         <span>No. {String(receipt.id).padStart(4, '0')}</span>
         <span>
-          Uploaded <time dateTime={receipt.uploadedAt}>{formatTimestamp(receipt.uploadedAt)}</time>
+          {typed ? 'Typed in' : 'Uploaded'}{' '}
+          <time dateTime={receipt.uploadedAt}>{formatTimestamp(receipt.uploadedAt)}</time>
         </span>
       </footer>
     </article>
@@ -327,7 +338,7 @@ export function UnreadableSlip({ receipt }: { receipt: ReceiptDetail }) {
       </p>
       <footer className="slip-foot">
         <span>No. {String(receipt.id).padStart(4, '0')}</span>
-        <span className="slip-file" title={receipt.originalFilename}>
+        <span className="slip-file" title={receipt.originalFilename ?? undefined}>
           {receipt.originalFilename}
         </span>
       </footer>

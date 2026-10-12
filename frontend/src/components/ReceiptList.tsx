@@ -1,4 +1,4 @@
-import type { Receipt, ReceiptStatus } from '../api';
+import { isTypedIn, type Receipt, type ReceiptStatus } from '../api';
 import { formatDate, formatMoney, formatMonth, formatPaise, formatTimestamp } from '../format';
 import {
   ADD_HREF,
@@ -177,8 +177,8 @@ function ReceiptSlip({ receipt }: { receipt: Receipt }) {
             {receipt.merchantName ?? UNREAD_MERCHANT[receipt.status]}
           </a>
         </h3>
-        <p className="receipt-file" title={receipt.originalFilename}>
-          {receipt.originalFilename}
+        <p className="receipt-file" title={receipt.originalFilename ?? undefined}>
+          {isTypedIn(receipt) ? 'Typed in' : receipt.originalFilename}
         </p>
       </header>
 

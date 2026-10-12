@@ -93,6 +93,11 @@
   gap: 40px;
 }
 
+/* A typed entry has no original to put beside the slip, so the slip stands alone. */
+.review-layout[data-typed] {
+  grid-template-columns: minmax(0, 440px);
+}
+
 .review-side,
 .review-form {
   display: flex;
@@ -724,6 +729,15 @@
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' seed='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -3.2 2.45'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
+/* On a typed entry the section holds nothing else, so the stamp gets the middle of it. */
+.slip-stamp-only {
+  min-height: 92px;
+}
+
+.slip-stamp-only .stamp {
+  left: 50%;
+}
+
 /* ---------- slips for receipts that can't be reviewed yet ---------- */
 
 .slip-short {
@@ -984,6 +998,10 @@
     width: 100%;
     max-width: 440px;
     margin: 0 auto;
+  }
+
+  .review-layout[data-typed] {
+    justify-content: center;
   }
 }
 
